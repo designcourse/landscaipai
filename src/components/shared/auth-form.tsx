@@ -173,6 +173,17 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
           />
         </div>
 
+        {isLogin && (
+          <div className="flex justify-end">
+            <a
+              href="/forgot-password"
+              className="text-sm text-primary hover:text-primary-light"
+            >
+              Forgot password?
+            </a>
+          </div>
+        )}
+
         {error && (
           <p className="text-sm text-destructive">{error}</p>
         )}

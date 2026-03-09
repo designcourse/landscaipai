@@ -651,12 +651,13 @@ landscaipai-2026/
 │   │   ├── projects/              # Project list + detail
 │   │   ├── billing/               # Pricing + checkout
 │   │   ├── admin/                 # Admin components
-│   │   └── shared/                # Shared/common components
+│   │   └── shared/                # Shared/common (auth-form, navbar, etc.)
 │   ├── lib/
 │   │   ├── supabase/
 │   │   │   ├── client.ts          # Browser client
 │   │   │   ├── server.ts          # Server client
-│   │   │   └── admin.ts           # Service role client
+│   │   │   ├── admin.ts           # Service role client
+│   │   │   └── queries.ts         # Cached helpers (getAuthenticatedProfile)
 │   │   ├── gemini/
 │   │   │   ├── client.ts          # Gemini API client
 │   │   │   └── prompts.ts         # Prompt construction logic
@@ -671,11 +672,15 @@ landscaipai-2026/
 │   ├── types/                     # TypeScript types
 │   └── middleware.ts              # Auth + role middleware
 ├── supabase/
-│   ├── migrations/                # Database migrations
-│   └── seed.sql                   # Seed data
+│   └── migrations/
+│       ├── 20260309000001_tables.sql              # 9 tables + indexes
+│       ├── 20260309000002_functions.sql            # Credit functions
+│       ├── 20260309000003_rls.sql                  # RLS policies
+│       └── 20260309000004_triggers_and_seeds.sql   # Auto-profile trigger + seeds
 ├── docs/
 │   ├── prd.md
-│   └── architecture.md
+│   ├── architecture.md
+│   └── brand.md                   # Design tokens + brand guidelines
 ├── CLAUDE.md
 ├── tailwind.config.ts
 ├── next.config.ts

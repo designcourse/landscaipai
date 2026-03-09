@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-const protectedRoutes = ["/dashboard", "/project", "/generate", "/account"];
+const protectedRoutes = ["/dashboard", "/project", "/generate", "/account", "/reset-password"];
 const adminRoutes = ["/admin"];
 const authRoutes = ["/login", "/signup"];
 
