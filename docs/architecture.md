@@ -494,7 +494,7 @@ Client                    Supabase Auth              Next.js Server
   │                              │                        │
   │  1a. Google OAuth click      │                        │
   │     OR                       │                        │
-  │  1b. Email/password signup   │                        │
+  │  1b. Email/password sign up  │                        │
   │─────────────────────────────>│                        │
   │                              │                        │
   │  2. Auth callback            │                        │

@@ -57,8 +57,18 @@ npm run test      # Tests (framework TBD)
 - Simplistic, clean, professional but approachable
 - Mobile-first, fully responsive (phones, tablets, desktop)
 
+## Style Rules
+
+- **All UI must use Tailwind theme tokens** configured from `docs/brand.md` and defined in `src/app/globals.css` under `@theme inline`.
+- **Never use raw hex colors** (e.g. `#0F8000`) in components — use `text-primary`, `bg-muted`, `border-border`, etc.
+- **Never hardcode font values** — use `font-sans` / `font-mono` tokens.
+- **Never hardcode margin, padding, gap, or spacing values** (e.g. `p-[24px]`, `mt-[64px]`) — use the named spacing tokens (`p-element`, `mt-section`, `gap-tight`, etc.) or Tailwind's default numeric scale (`p-4`, `mt-8`).
+- **Never hardcode border-radius** — use `rounded-sm`, `rounded-md`, `rounded-lg`, `rounded-full` mapped to theme tokens.
+- **Never hardcode shadows** — use `shadow-sm`, `shadow-md`, `shadow-lg` mapped to theme tokens.
+- If a needed token doesn't exist, add it to `docs/brand.md` and `src/app/globals.css` first, then use it.
+
 ## Docs
 
 - [Product Requirements](docs/prd.md)
 - [Technical Architecture](docs/architecture.md)
-- [Brand Guidelines](docs/brand.md) *(TODO: create)*
+- [Brand Guidelines](docs/brand.md)
