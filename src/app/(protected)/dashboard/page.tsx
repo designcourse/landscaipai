@@ -1,5 +1,7 @@
 import { getAuthenticatedProfile } from "@/lib/supabase/queries";
+import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { ProjectList } from "@/components/projects/project-list";
 
 export const metadata = { title: "Dashboard" };
 
@@ -9,6 +11,20 @@ export default async function DashboardPage() {
   if (!user) {
     redirect("/login");
   }
+
+  const supabase = await createClient();
+
+  // Fetch projects with image count
+  const { data: projects } = await supabase
+    .from("projects")
+    .select("*, images(count)")
+    .eq("user_id", user.id)
+    .order("updated_at", { ascending: false });
+
+  const projectsWithCount = (projects ?? []).map((p) => ({
+    ...p,
+    image_count: p.images?.[0]?.count ?? 0,
+  }));
 
   const displayName = profile?.full_name || user.email?.split("@")[0] || "there";
 
@@ -28,12 +44,7 @@ export default async function DashboardPage() {
           </p>
         </div>
 
-        {/* Placeholder for project list */}
-        <div className="rounded-lg border border-border bg-muted p-section text-center">
-          <p className="text-muted-foreground">
-            Your projects will appear here. Upload a photo to get started.
-          </p>
-        </div>
+        <ProjectList initialProjects={projectsWithCount} />
       </div>
     </main>
   );
