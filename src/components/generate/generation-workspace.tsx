@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   STYLE_PRESETS,
@@ -8,7 +8,9 @@ import {
   SEASON_OPTIONS,
   WEATHER_OPTIONS,
 } from "@/lib/gemini/prompts";
-import type { Image, Generation } from "@/types";
+import { InpaintCanvas } from "./inpaint-canvas";
+import { PlantBrowser } from "./plant-browser";
+import type { Image, Generation, LibraryItem } from "@/types";
 
 type GenerationWithUrl = Generation & { url: string };
 
@@ -19,6 +21,7 @@ interface GenerationWorkspaceProps {
   projectName: string;
   initialGenerations: GenerationWithUrl[];
   creditsBalance: number;
+  hardinessZone?: string | null;
 }
 
 export function GenerationWorkspace({
@@ -28,6 +31,7 @@ export function GenerationWorkspace({
   projectName,
   initialGenerations,
   creditsBalance: initialCredits,
+  hardinessZone,
 }: GenerationWorkspaceProps) {
   const [generations, setGenerations] =
     useState<GenerationWithUrl[]>(initialGenerations);
@@ -54,6 +58,23 @@ export function GenerationWorkspace({
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // In-painting state
+  const [inpaintMode, setInpaintMode] = useState(false);
+  const [maskBase64, setMaskBase64] = useState<string | null>(null);
+  const [rawMaskBase64, setRawMaskBase64] = useState<string | null>(null);
+
+  // Plant browser state
+  const [browserOpen, setBrowserOpen] = useState(false);
+  const [selectedLibraryItems, setSelectedLibraryItems] = useState<LibraryItem[]>([]);
+  const [browserFocusId, setBrowserFocusId] = useState<string | null>(null);
+
+  // Clear mask when active image changes (use identity, not URL which can change on refresh)
+  useEffect(() => {
+    setMaskBase64(null);
+    setRawMaskBase64(null);
+    setInpaintMode(false);
+  }, [activeImage.generationId]);
+
   function handleStartOver() {
     setActiveImage({
       url: originalImageUrl,
@@ -70,39 +91,83 @@ export function GenerationWorkspace({
     });
   }
 
+  function handleMaskConfirm(overlayDataUrl: string, rawMaskDataUrl: string) {
+    setMaskBase64(overlayDataUrl.replace(/^data:image\/\w+;base64,/, ""));
+    setRawMaskBase64(rawMaskDataUrl.replace(/^data:image\/\w+;base64,/, ""));
+    setInpaintMode(false);
+  }
+
+  function handleMaskCancel() {
+    setInpaintMode(false);
+  }
+
+  function handleClearMask() {
+    setMaskBase64(null);
+    setRawMaskBase64(null);
+  }
+
   async function handleGenerate(e: React.FormEvent) {
     e.preventDefault();
     if (generating) return;
 
-    if (!style && !customPrompt.trim()) {
-      setError("Select a style or enter a custom prompt.");
-      return;
+    // Validation
+    if (maskBase64) {
+      if (!customPrompt.trim()) {
+        setError(
+          "Enter a prompt describing what to change in the selected area."
+        );
+        return;
+      }
+    } else {
+      if (!style && !customPrompt.trim()) {
+        setError("Select a style or enter a custom prompt.");
+        return;
+      }
     }
 
     setError(null);
     setGenerating(true);
 
     try {
-      const res = await fetch("/api/generate", {
+      const endpoint = maskBase64 ? "/api/generate/inpaint" : "/api/generate";
+      const selectedPlants = selectedLibraryItems
+        .filter((i) => i.item_type === "plant")
+        .map((i) => ({ common_name: i.common_name, scientific_name: i.scientific_name, image_path: i.image_path }));
+      const selectedHardscape = selectedLibraryItems
+        .filter((i) => i.item_type === "hardscape")
+        .map((i) => ({ common_name: i.common_name, image_path: i.image_path }));
+
+      const payload: Record<string, unknown> = {
+        imageId: image.id,
+        projectId,
+        style,
+        timeOfDay: timeOfDay || undefined,
+        season: season || undefined,
+        weather: weather || undefined,
+        customPrompt: customPrompt.trim() || undefined,
+        parentGenerationId: activeImage.generationId || undefined,
+        selectedPlants: selectedPlants.length > 0 ? selectedPlants : undefined,
+        selectedHardscape: selectedHardscape.length > 0 ? selectedHardscape : undefined,
+      };
+
+      if (maskBase64) {
+        payload.maskOverlayBase64 = maskBase64;
+        payload.rawMaskBase64 = rawMaskBase64;
+      }
+
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          imageId: image.id,
-          projectId,
-          style,
-          timeOfDay: timeOfDay || undefined,
-          season: season || undefined,
-          weather: weather || undefined,
-          customPrompt: customPrompt.trim() || undefined,
-          parentGenerationId: activeImage.generationId || undefined,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
         if (data.code === "NO_CREDITS") {
-          setError("You're out of credits. Visit the pricing page to get more.");
+          setError(
+            "You're out of credits. Visit the pricing page to get more."
+          );
         } else {
           setError(data.error || "Generation failed. Please try again.");
         }
@@ -120,7 +185,7 @@ export function GenerationWorkspace({
         time_of_day: data.generation.time_of_day,
         season: data.generation.season,
         weather: data.generation.weather,
-        is_inpaint: false,
+        is_inpaint: !!maskBase64,
         input_tokens: null,
         output_tokens: null,
         generation_cost_cents: null,
@@ -137,6 +202,7 @@ export function GenerationWorkspace({
         generationId: newGen.id,
       });
       setCredits(data.credits_remaining);
+      setMaskBase64(null);
     } catch {
       setError("Network error. Please try again.");
     } finally {
@@ -156,6 +222,26 @@ export function GenerationWorkspace({
 
   return (
     <div className="space-y-6">
+      {/* In-painting canvas overlay */}
+      {inpaintMode && (
+        <InpaintCanvas
+          imageUrl={activeImage.url}
+          onConfirm={handleMaskConfirm}
+          onCancel={handleMaskCancel}
+        />
+      )}
+
+      {/* Plant browser slide-over */}
+      {browserOpen && (
+        <PlantBrowser
+          hardinessZone={hardinessZone ?? null}
+          selectedItems={selectedLibraryItems}
+          onSelectionChange={setSelectedLibraryItems}
+          onClose={() => { setBrowserOpen(false); setBrowserFocusId(null); }}
+          focusItemId={browserFocusId}
+        />
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -202,7 +288,9 @@ export function GenerationWorkspace({
                   />
                 </svg>
                 <p className="text-sm font-medium text-foreground">
-                  Generating your landscape design...
+                  {maskBase64
+                    ? "Applying changes to selected area..."
+                    : "Generating your landscape design..."}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   This usually takes 10-30 seconds
@@ -217,17 +305,57 @@ export function GenerationWorkspace({
             )}
           </div>
 
-          {/* Image label + start over */}
+          {/* Image label + actions */}
           <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">{activeImage.label}</p>
-            {activeImage.generationId && (
-              <button
-                onClick={handleStartOver}
-                className="text-sm text-primary transition-colors hover:text-primary-light"
-              >
-                Start over with original
-              </button>
-            )}
+            <div className="flex items-center gap-3">
+              <p className="text-sm text-muted-foreground">
+                {activeImage.label}
+              </p>
+              {maskBase64 && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                  <svg
+                    className="h-3 w-3"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                    />
+                  </svg>
+                  Mask active
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              {maskBase64 ? (
+                <button
+                  onClick={handleClearMask}
+                  className="text-sm text-destructive transition-colors hover:text-destructive/80"
+                >
+                  Clear mask
+                </button>
+              ) : (
+                <button
+                  onClick={() => setInpaintMode(true)}
+                  disabled={generating}
+                  className="text-sm text-primary transition-colors hover:text-primary-light disabled:opacity-50"
+                >
+                  Edit Region
+                </button>
+              )}
+              {activeImage.generationId && (
+                <button
+                  onClick={handleStartOver}
+                  className="text-sm text-primary transition-colors hover:text-primary-light"
+                >
+                  Start over with original
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Generation history thumbnails */}
@@ -257,7 +385,7 @@ export function GenerationWorkspace({
                   <button
                     key={gen.id}
                     onClick={() => selectGeneration(gen)}
-                    className={`shrink-0 overflow-hidden rounded-md border-2 ${
+                    className={`relative shrink-0 overflow-hidden rounded-md border-2 ${
                       activeImage.generationId === gen.id
                         ? "border-primary"
                         : "border-border hover:border-primary/50"
@@ -268,6 +396,11 @@ export function GenerationWorkspace({
                       alt="Generation"
                       className="h-16 w-20 object-cover"
                     />
+                    {gen.is_inpaint && (
+                      <span className="absolute bottom-0.5 right-0.5 rounded-sm bg-primary/80 px-1 py-0.5 text-[10px] font-medium leading-none text-white">
+                        edit
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>
@@ -374,16 +507,78 @@ export function GenerationWorkspace({
           {/* Custom prompt */}
           <div>
             <label className="mb-1 block text-sm font-medium text-foreground">
-              Custom Prompt
+              {maskBase64 ? "Edit Prompt" : "Custom Prompt"}
             </label>
             <textarea
               value={customPrompt}
               onChange={(e) => setCustomPrompt(e.target.value)}
-              placeholder="Add specific requests... e.g., 'Add a stone walkway to the front door with lavender borders'"
+              placeholder={
+                maskBase64
+                  ? "Describe what to change in the selected area... e.g., 'Replace with a stone walkway bordered by lavender'"
+                  : "Add specific requests... e.g., 'Add a stone walkway to the front door with lavender borders'"
+              }
               rows={3}
               className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
+            {maskBase64 && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Your prompt will be applied only to the masked area.
+                Environment settings apply globally.
+              </p>
+            )}
           </div>
+
+          {/* Selected library items */}
+          {selectedLibraryItems.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {selectedLibraryItems.map((item) => (
+                <span
+                  key={item.id}
+                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${
+                    item.item_type === "plant"
+                      ? "bg-primary/10 text-primary"
+                      : "bg-muted text-foreground"
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBrowserFocusId(item.id);
+                      setBrowserOpen(true);
+                    }}
+                    className="cursor-pointer hover:underline"
+                  >
+                    {item.common_name}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSelectedLibraryItems((prev) =>
+                        prev.filter((i) => i.id !== item.id)
+                      )
+                    }
+                    className="ml-0.5 rounded-full hover:bg-black/10"
+                  >
+                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Browse library button */}
+          <button
+            type="button"
+            onClick={() => setBrowserOpen(true)}
+            className="flex w-full items-center justify-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+            </svg>
+            Browse Plant & Material Library
+          </button>
 
           {/* Error */}
           {error && <p className="text-sm text-destructive">{error}</p>}
@@ -395,10 +590,14 @@ export function GenerationWorkspace({
             className="w-full rounded-sm bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-light disabled:opacity-50"
           >
             {generating
-              ? "Generating..."
+              ? maskBase64
+                ? "Applying edit..."
+                : "Generating..."
               : credits < 1
                 ? "No credits remaining"
-                : "Generate (1 credit)"}
+                : maskBase64
+                  ? "Apply Edit (1 credit)"
+                  : "Generate (1 credit)"}
           </button>
 
           {credits < 1 && (

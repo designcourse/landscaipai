@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { ImageUpload } from "@/components/projects/image-upload";
+import { ZoneSelector } from "@/components/shared/zone-selector";
 import { BUCKET_UPLOADS } from "@/lib/utils/storage";
 import type { Project, Image } from "@/types";
 
@@ -25,6 +26,8 @@ export function ProjectDetail({ project, images: initialImages, userId }: Projec
   const [shareSlug, setShareSlug] = useState(project.share_slug);
   const [menuOpen, setMenuOpen] = useState(false);
   const [images, setImages] = useState<ImageWithUrl[]>(initialImages);
+  const [zone, setZone] = useState(project.hardiness_zone);
+  const [editingZone, setEditingZone] = useState(false);
   const editInputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -113,6 +116,25 @@ export function ProjectDetail({ project, images: initialImages, userId }: Projec
     if (slug) setShareSlug(slug);
   }
 
+  async function handleZoneSelect(selectedZone: string, zipCode?: string) {
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("projects")
+      .update({
+        hardiness_zone: selectedZone,
+        zip_code: zipCode ?? null,
+      })
+      .eq("id", project.id);
+
+    if (error) {
+      alert("Failed to update zone: " + error.message);
+      return;
+    }
+
+    setZone(selectedZone);
+    setEditingZone(false);
+  }
+
   function copyShareLink() {
     if (shareSlug) {
       navigator.clipboard.writeText(
@@ -182,9 +204,41 @@ export function ProjectDetail({ project, images: initialImages, userId }: Projec
                 {name}
               </h1>
             )}
-            <p className="mt-1 text-sm text-muted-foreground">
-              {images.length} {images.length === 1 ? "image" : "images"}
-            </p>
+            <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
+              <span>
+                {images.length} {images.length === 1 ? "image" : "images"}
+              </span>
+              {zone && !editingZone && (
+                <>
+                  <span>&middot;</span>
+                  <button
+                    onClick={() => setEditingZone(true)}
+                    className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary transition-colors hover:bg-primary/20"
+                  >
+                    Zone {zone.toUpperCase()}
+                  </button>
+                </>
+              )}
+              {!zone && !editingZone && (
+                <>
+                  <span>&middot;</span>
+                  <button
+                    onClick={() => setEditingZone(true)}
+                    className="text-xs text-primary transition-colors hover:text-primary-light"
+                  >
+                    Set zone for plant recommendations
+                  </button>
+                </>
+              )}
+            </div>
+            {editingZone && (
+              <div className="mt-2">
+                <ZoneSelector
+                  onSelect={handleZoneSelect}
+                  onCancel={() => setEditingZone(false)}
+                />
+              </div>
+            )}
           </div>
 
           {/* Actions */}

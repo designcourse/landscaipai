@@ -1,5 +1,43 @@
 export type UserType = "landscaper" | "homeowner" | "admin";
 
+export type LibraryItemType = "plant" | "hardscape";
+
+export interface LibraryItem {
+  id: string;
+  item_type: LibraryItemType;
+  common_name: string;
+  scientific_name: string | null;
+  category: string;
+  subcategory: string;
+  description: string | null;
+  image_path: string | null;
+  thumbnail_path: string | null;
+  zone_min: string | null;
+  zone_max: string | null;
+  height_min_ft: number | null;
+  height_max_ft: number | null;
+  spread_min_ft: number | null;
+  spread_max_ft: number | null;
+  sun_requirement: string | null;
+  water_needs: string | null;
+  growth_rate: string | null;
+  maintenance_level: string | null;
+  foliage_type: string | null;
+  bloom_season: string[] | null;
+  flower_colors: string[] | null;
+  foliage_colors: string[] | null;
+  drought_tolerant: boolean;
+  deer_resistant: boolean;
+  attracts_pollinators: boolean;
+  native_regions: string[] | null;
+  toxic_to_pets: boolean;
+  material_type: string | null;
+  color_options: string[] | null;
+  design_styles: string[] | null;
+  common_uses: string[] | null;
+  created_at: string;
+}
+
 export interface Profile {
   id: string;
   email: string;
@@ -16,6 +54,8 @@ export interface Project {
   id: string;
   user_id: string;
   name: string;
+  zip_code: string | null;
+  hardiness_zone: string | null;
   is_shared: boolean;
   share_slug: string | null;
   created_at: string;

@@ -26,6 +26,38 @@ export async function attachSignedUrls<T extends { storage_path: string }>(
   }));
 }
 
+export const BUCKET_PLANT_LIBRARY = "plant-library";
+
+// Fetch library reference images as base64 for Gemini multimodal input
+export async function fetchLibraryImageParts(
+  client: SupabaseClient,
+  items: { common_name: string; image_path?: string | null }[]
+): Promise<{ mimeType: string; data: string; label: string }[]> {
+  const withImages = items.filter((i) => i.image_path);
+  if (!withImages.length) return [];
+
+  const results = await Promise.all(
+    withImages.map(async (item) => {
+      try {
+        const { data, error } = await client.storage
+          .from(BUCKET_PLANT_LIBRARY)
+          .download(item.image_path!);
+        if (error || !data) return null;
+        const buf = Buffer.from(await data.arrayBuffer());
+        return {
+          mimeType: "image/webp",
+          data: buf.toString("base64"),
+          label: item.common_name,
+        };
+      } catch {
+        return null;
+      }
+    })
+  );
+
+  return results.filter((r): r is NonNullable<typeof r> => r !== null);
+}
+
 // Path within each bucket: {user_id}/{project_id}/{filename}
 
 export function getUploadPath(

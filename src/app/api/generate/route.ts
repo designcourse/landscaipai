@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { deductCredit, refundCredit } from "@/lib/utils/credits";
 import { buildPrompt } from "@/lib/gemini/prompts";
-import { getGenerationPath, BUCKET_GENERATIONS, BUCKET_UPLOADS } from "@/lib/utils/storage";
+import { getGenerationPath, BUCKET_GENERATIONS, BUCKET_UPLOADS, fetchLibraryImageParts } from "@/lib/utils/storage";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
@@ -31,6 +31,8 @@ export async function POST(request: NextRequest) {
       weather,
       customPrompt,
       parentGenerationId,
+      selectedPlants,
+      selectedHardscape,
     } = body;
 
     if (!imageId || !projectId) {
@@ -45,7 +47,7 @@ export async function POST(request: NextRequest) {
     // 3. Verify image ownership
     const { data: image } = await admin
       .from("images")
-      .select("*")
+      .select("storage_path")
       .eq("id", imageId)
       .eq("user_id", user.id)
       .single();
@@ -101,7 +103,7 @@ export async function POST(request: NextRequest) {
     // 5. Create generation record (pending)
     const generationId = crypto.randomUUID();
     const storagePath = getGenerationPath(user.id, projectId, generationId);
-    const prompt = buildPrompt({ style, timeOfDay, season, weather, customPrompt });
+    const prompt = buildPrompt({ style, timeOfDay, season, weather, customPrompt, selectedPlants, selectedHardscape });
 
     const { error: insertError } = await admin.from("generations").insert({
       id: generationId,
@@ -139,25 +141,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 7. Update status to processing
-    await admin
-      .from("generations")
-      .update({ status: "processing" })
-      .eq("id", generationId);
+    // 7. Update status to processing + fetch reference images in parallel
+    const allSelectedItems = [
+      ...(selectedPlants ?? []),
+      ...(selectedHardscape ?? []),
+    ];
+    const [, refImages] = await Promise.all([
+      admin.from("generations").update({ status: "processing" }).eq("id", generationId),
+      fetchLibraryImageParts(admin, allSelectedItems),
+    ]);
 
-    // 8. Call Gemini
+    // 9. Call Gemini
     let generatedImageBase64: string | null = null;
 
     try {
+      // Build parts: source photo first, then reference images, then prompt
+      const parts: { inlineData?: { mimeType: string; data: string }; text?: string }[] = [
+        { inlineData: { mimeType, data: base64Image } },
+      ];
+      for (const ref of refImages) {
+        parts.push({ inlineData: { mimeType: ref.mimeType, data: ref.data } });
+      }
+      parts.push({ text: prompt });
+
       const response = await ai.models.generateContent({
         model: "gemini-3.1-flash-image-preview",
         contents: [
           {
             role: "user",
-            parts: [
-              { inlineData: { mimeType, data: base64Image } },
-              { text: prompt },
-            ],
+            parts,
           },
         ],
       });

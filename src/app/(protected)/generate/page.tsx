@@ -29,7 +29,7 @@ export default async function GeneratePage({
   // Fetch the source image (need storage_path before we can get signed URL)
   const { data: image } = await supabase
     .from("images")
-    .select("*, projects(id, name)")
+    .select("*, projects(id, name, hardiness_zone)")
     .eq("id", imageId)
     .single();
 
@@ -50,7 +50,7 @@ export default async function GeneratePage({
   // Batch signed URLs for generations (single HTTP request)
   const generationsWithUrls = await attachSignedUrls(admin, BUCKET_GENERATIONS, generations ?? []);
 
-  const project = (image as Record<string, unknown>).projects as { id: string; name: string };
+  const project = (image as Record<string, unknown>).projects as { id: string; name: string; hardiness_zone: string | null };
 
   return (
     <main className="mx-auto max-w-7xl px-element py-8">
@@ -61,6 +61,7 @@ export default async function GeneratePage({
         projectName={project.name}
         initialGenerations={generationsWithUrls}
         creditsBalance={profile?.credits_balance ?? 0}
+        hardinessZone={project.hardiness_zone}
       />
     </main>
   );
