@@ -181,6 +181,8 @@ export function GenerationWorkspace({
         parent_generation_id: activeImage.generationId,
         storage_path: "",
         prompt: data.generation.prompt,
+        custom_prompt: data.generation.custom_prompt ?? null,
+        selected_library_items: data.generation.selected_library_items ?? null,
         style_preset: data.generation.style_preset,
         time_of_day: data.generation.time_of_day,
         season: data.generation.season,

@@ -1,0 +1,429 @@
+"use client";
+
+import { useState, useRef, useCallback, memo } from "react";
+import type { Generation } from "@/types";
+import type { ItemPosition } from "@/hooks/use-canvas-positions";
+
+type GenerationWithUrl = Generation & { url: string };
+
+export interface CanvasItem {
+  id: string;
+  type: "original" | "generation";
+  imageId: string;
+  url: string;
+  naturalWidth: number;
+  naturalHeight: number;
+  generation?: GenerationWithUrl;
+  title?: string;
+  libraryTags?: { name: string; thumbnailUrl: string; id?: string }[];
+  userPrompt?: string; // The user's custom prompt only (not the system prompt)
+  settingsSummary?: string; // e.g. "Summer · Partly Cloudy"
+  status?: "ready" | "generating" | "revealing";
+  sourceUrl?: string; // URL of the source image (shown during generation animation)
+}
+
+interface CanvasImageCardProps {
+  item: CanvasItem;
+  position: ItemPosition;
+  selected: boolean;
+  zoom: number;
+  isSpaceDown: React.RefObject<boolean>;
+  onSelect: (id: string, e?: React.PointerEvent | React.MouseEvent) => void;
+  onPositionChange: (id: string, partial: Partial<ItemPosition>) => void;
+  onEditRegion: (id: string) => void;
+  onRequestDelete: (id: string) => void;
+  onLibraryTagClick?: (tagId: string) => void;
+}
+
+const RESIZE_HANDLE_SIZE = 10;
+const MIN_WIDTH = 100;
+
+export const CanvasImageCard = memo(function CanvasImageCard({
+  item,
+  position,
+  selected,
+  zoom,
+  isSpaceDown,
+  onSelect,
+  onPositionChange,
+  onEditRegion,
+  onRequestDelete,
+  onLibraryTagClick,
+}: CanvasImageCardProps) {
+  const [hovered, setHovered] = useState(false);
+  const [revealed, setRevealed] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const isDragging = useRef(false);
+  const isResizing = useRef(false);
+  const dragStart = useRef<{ x: number; y: number; itemX: number; itemY: number } | null>(null);
+  const resizeStart = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
+
+  const aspect = position.height / position.width;
+
+  // --- Drag ---
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      if (isSpaceDown.current) return; // Let pan handler take over
+      if ((e.target as HTMLElement).dataset.resizeHandle) return; // Resize handle
+
+      e.stopPropagation();
+      onSelect(item.id, e);
+
+      isDragging.current = true;
+      dragStart.current = {
+        x: e.clientX,
+        y: e.clientY,
+        itemX: position.x,
+        itemY: position.y,
+      };
+      (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+    },
+    [item.id, position.x, position.y, onSelect, isSpaceDown]
+  );
+
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (isDragging.current && dragStart.current) {
+        const dx = (e.clientX - dragStart.current.x) / zoom;
+        const dy = (e.clientY - dragStart.current.y) / zoom;
+        onPositionChange(item.id, {
+          x: dragStart.current.itemX + dx,
+          y: dragStart.current.itemY + dy,
+        });
+      }
+      if (isResizing.current && resizeStart.current) {
+        const dx = (e.clientX - resizeStart.current.x) / zoom;
+        const newWidth = Math.max(MIN_WIDTH, resizeStart.current.width + dx);
+        const newHeight = newWidth * aspect;
+        onPositionChange(item.id, { width: newWidth, height: newHeight });
+      }
+    },
+    [item.id, zoom, aspect, onPositionChange]
+  );
+
+  const handlePointerUp = useCallback(() => {
+    isDragging.current = false;
+    isResizing.current = false;
+    dragStart.current = null;
+    resizeStart.current = null;
+  }, []);
+
+  // --- Resize ---
+  const handleResizePointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      e.stopPropagation();
+      onSelect(item.id);
+      isResizing.current = true;
+      resizeStart.current = {
+        x: e.clientX,
+        y: e.clientY,
+        width: position.width,
+        height: position.height,
+      };
+      (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+    },
+    [item.id, position.width, position.height, onSelect]
+  );
+
+  const isGenerating = item.status === "generating";
+  const isRevealing = item.status === "revealing";
+
+  // Progressive disclosure: fade out metadata below images at low zoom to prevent overlap.
+  // Cards are only 30px apart, so counter-scaling text causes immediate overlap.
+  // Instead, we hide details when zoomed out (standard canvas UX — zoom in for details).
+  const DETAIL_FADE_START = 0.75; // begin fading
+  const DETAIL_FADE_END = 0.55;   // fully hidden
+  const detailOpacity = zoom >= DETAIL_FADE_START ? 1
+    : zoom <= DETAIL_FADE_END ? 0
+    : (zoom - DETAIL_FADE_END) / (DETAIL_FADE_START - DETAIL_FADE_END);
+
+  // Title sits above the image and is short ("AI GENERATED"), so counter-scaling
+  // won't overflow into adjacent cards. Cap at 2.5x to be safe.
+  const titleScale = Math.max(1, Math.min(13 / (12 * zoom), 2.5));
+
+  // Edit Region button is inside the image (overflow-hidden), so counter-scaling is safe.
+  const editScale = Math.max(1, Math.min(13 / (14 * zoom), 2.0));
+  const showEditRegion = hovered && !isGenerating && !isRevealing && zoom >= 0.4;
+
+  return (
+    <div
+      className="absolute select-none"
+      style={{
+        left: position.x,
+        top: position.y,
+        width: position.width,
+      }}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => { setHovered(false); setMenuOpen(false); }}
+    >
+      {/* Title (generations only) */}
+      {item.type === "generation" && item.title && (
+        <p
+          className="mb-3 text-xs font-bold uppercase tracking-wider"
+          style={{
+            color: "var(--color-canvas-label)",
+            transform: titleScale > 1 ? `scale(${titleScale})` : undefined,
+            transformOrigin: "bottom left",
+          }}
+        >
+          {item.title}
+        </p>
+      )}
+
+      {/* Image container */}
+      <div
+        className="relative overflow-hidden rounded-md"
+        style={{
+          width: position.width,
+          height: position.height,
+          boxShadow: "0px 2px 8px 0px rgba(0,0,0,0.05), 0px 14px 18.5px -4px rgba(0,0,0,0.17)",
+        }}
+      >
+        {/* Source image (shown during generation as the "before") */}
+        {isGenerating && item.sourceUrl && (
+          <img
+            src={item.sourceUrl}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover"
+            draggable={false}
+          />
+        )}
+
+        {/* Actual image */}
+        {!isGenerating && (
+          <img
+            src={item.url}
+            alt={item.title || (item.type === "original" ? "Original photo" : "Generated result")}
+            className="h-full w-full object-cover"
+            style={{
+              opacity: isRevealing && !revealed ? 0 : 1,
+              transition: isRevealing ? "opacity 2s ease" : "none",
+            }}
+            onLoad={() => {
+              if (isRevealing) {
+                // Trigger the reveal transition after the image loads
+                requestAnimationFrame(() => setRevealed(true));
+              }
+            }}
+            draggable={false}
+          />
+        )}
+
+        {/* Shimmer animation overlay during generation */}
+        {isGenerating && (
+          <div
+            className="absolute inset-0"
+            style={{
+              background: "linear-gradient(90deg, transparent 30%, rgba(255,255,255,0.4) 50%, transparent 70%)",
+              backgroundSize: "200% 100%",
+              animation: "canvas-shimmer 2s infinite linear",
+            }}
+          />
+        )}
+
+        {/* Selection outline */}
+        {selected && (
+          <div className="pointer-events-none absolute inset-0 rounded-md border-2 border-blue-500" />
+        )}
+
+        {/* Hover action buttons (Edit Region + 3-dot menu) */}
+        {showEditRegion && (
+          <div
+            className="absolute right-4 top-4 flex items-center gap-2"
+            style={{
+              transform: editScale > 1 ? `scale(${editScale})` : undefined,
+              transformOrigin: "top right",
+            }}
+          >
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onEditRegion(item.id);
+              }}
+              className="flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-semibold shadow-lg transition-shadow hover:shadow-xl"
+              style={{ color: "#1a1a1a" }}
+            >
+              <svg className="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+              </svg>
+              Edit Region
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setMenuOpen((prev) => !prev);
+              }}
+              className="flex h-[38px] w-[38px] items-center justify-center rounded-full bg-white shadow-lg transition-shadow hover:shadow-xl"
+            >
+              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="#1a1a1a">
+                <circle cx="12" cy="5" r="2" />
+                <circle cx="12" cy="12" r="2" />
+                <circle cx="12" cy="19" r="2" />
+              </svg>
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* 3-dot dropdown menu — rendered outside overflow-hidden container */}
+      {menuOpen && (
+        <div
+          className="absolute z-50"
+          style={{
+            right: 16,
+            top: (item.type === "generation" && item.title ? 28 : 0) + 16,
+            transform: editScale > 1 ? `scale(${editScale})` : undefined,
+            transformOrigin: "top right",
+          }}
+        >
+          <div className="mt-12 min-w-[160px] rounded-lg bg-white py-1 shadow-lg" style={{ border: "1px solid var(--color-border)" }}>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setMenuOpen(false);
+                // Download the image via a temporary anchor
+                const a = document.createElement("a");
+                a.href = item.url;
+                a.download = item.type === "original" ? "original.jpg" : `generation-${item.id.slice(0, 8)}.webp`;
+                a.target = "_blank";
+                a.rel = "noopener";
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+              }}
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors hover:bg-gray-100"
+              style={{ color: "var(--color-foreground)" }}
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Download
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setMenuOpen(false);
+                onRequestDelete(item.id);
+              }}
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors hover:bg-red-50"
+              style={{ color: "var(--color-destructive)" }}
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Delete
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Resize handles (selected only) — corners hug the image, not the metadata */}
+      {selected && !isGenerating && (() => {
+        // Title adds ~28px above the image for generations (text-xs + mb-3)
+        const titleOffset = item.type === "generation" && item.title ? 28 : 0;
+        const imgTop = titleOffset - RESIZE_HANDLE_SIZE / 2;
+        const imgBottom = titleOffset + position.height - RESIZE_HANDLE_SIZE / 2;
+        return (
+          <>
+            {/* Top-left */}
+            <div
+              data-resize-handle="true"
+              className="absolute cursor-nw-resize rounded-full border-2 border-blue-500 bg-white"
+              style={{ left: -RESIZE_HANDLE_SIZE / 2, top: imgTop, width: RESIZE_HANDLE_SIZE, height: RESIZE_HANDLE_SIZE }}
+              onPointerDown={handleResizePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+            />
+            {/* Top-right */}
+            <div
+              data-resize-handle="true"
+              className="absolute cursor-ne-resize rounded-full border-2 border-blue-500 bg-white"
+              style={{ right: -RESIZE_HANDLE_SIZE / 2, top: imgTop, width: RESIZE_HANDLE_SIZE, height: RESIZE_HANDLE_SIZE }}
+              onPointerDown={handleResizePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+            />
+            {/* Bottom-left */}
+            <div
+              data-resize-handle="true"
+              className="absolute cursor-sw-resize rounded-full border-2 border-blue-500 bg-white"
+              style={{ left: -RESIZE_HANDLE_SIZE / 2, top: imgBottom, width: RESIZE_HANDLE_SIZE, height: RESIZE_HANDLE_SIZE }}
+              onPointerDown={handleResizePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+            />
+            {/* Bottom-right */}
+            <div
+              data-resize-handle="true"
+              className="absolute cursor-se-resize rounded-full border-2 border-blue-500 bg-white"
+              style={{ right: -RESIZE_HANDLE_SIZE / 2, top: imgBottom, width: RESIZE_HANDLE_SIZE, height: RESIZE_HANDLE_SIZE }}
+              onPointerDown={handleResizePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+            />
+          </>
+        );
+      })()}
+
+      {/* Library tags (generations only) — fade out when zoomed out to prevent overlap */}
+      {detailOpacity > 0 && item.type === "generation" && item.libraryTags && item.libraryTags.length > 0 && (
+        <div className="mt-7 flex gap-4" style={{ opacity: detailOpacity }}>
+          {item.libraryTags.map((tag) => (
+            <button
+              key={tag.name}
+              className="flex h-[38px] cursor-pointer items-center gap-1 rounded-[7px] bg-white p-[11px] transition-shadow hover:shadow-md"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (tag.id && onLibraryTagClick) onLibraryTagClick(tag.id);
+              }}
+            >
+              {tag.thumbnailUrl && (
+                <img
+                  src={tag.thumbnailUrl}
+                  alt=""
+                  className="h-[29px] w-[29px] rounded object-cover"
+                  draggable={false}
+                />
+              )}
+              <span className="text-sm font-bold text-black">{tag.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Prompt + settings (generations only) — fade out when zoomed out */}
+      {detailOpacity > 0 && item.type === "generation" && (item.userPrompt || item.settingsSummary) && (
+        <div className="mt-7" style={{ opacity: detailOpacity }}>
+          {item.userPrompt && (
+            <>
+              <p
+                className="text-xs font-bold uppercase tracking-wider"
+                style={{ color: "var(--color-canvas-label)" }}
+              >
+                PROMPT
+              </p>
+              <p className="mt-2 text-sm leading-[21px] text-black" style={{ maxWidth: 553 }}>
+                {item.userPrompt}
+              </p>
+            </>
+          )}
+          {item.settingsSummary && (
+            <p
+              className="font-bold uppercase tracking-wider"
+              style={{
+                color: "var(--color-canvas-label)",
+                fontSize: "0.75rem",
+                marginTop: 20,
+              }}
+            >
+              {item.settingsSummary}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+});

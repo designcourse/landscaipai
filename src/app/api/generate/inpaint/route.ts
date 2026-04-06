@@ -44,11 +44,11 @@ async function compositeWithMask(
   const featherRadius = Math.max(7, Math.round(Math.min(width, height) * 0.01));
   const sigma = featherRadius % 2 === 0 ? featherRadius + 1 : featherRadius;
 
-  // Parallelize all three resize operations
+  // Parallelize all three resize operations — ensure 3-channel RGB (no alpha surprises)
   const [resizedGenerated, processedMask, originalRaw] = await Promise.all([
-    sharp(generatedBuffer).resize(width, height, { fit: "fill" }).raw().toBuffer(),
+    sharp(generatedBuffer).resize(width, height, { fit: "fill" }).removeAlpha().raw().toBuffer(),
     sharp(maskBuffer).resize(width, height, { fit: "fill" }).grayscale().blur(sigma).raw().toBuffer(),
-    sharp(originalBuffer).resize(width, height, { fit: "fill" }).raw().toBuffer(),
+    sharp(originalBuffer).resize(width, height, { fit: "fill" }).removeAlpha().raw().toBuffer(),
   ]);
 
   // Composite: alpha-blend original and generated based on mask intensity
@@ -139,11 +139,15 @@ export async function POST(request: NextRequest) {
     // 4. Get source image bytes (original upload or parent generation)
     let sourcePath: string;
     let sourceBucket: string;
+    // Detect if scene-wide settings (time/season/weather) changed from the parent.
+    // When they change, we skip mask compositing so the full Gemini output is used
+    // (otherwise compositing pastes the old lighting back over non-masked areas).
+    let hasSceneChange = !!(timeOfDay || season || weather);
 
     if (parentGenerationId) {
       const { data: parentGen } = await admin
         .from("generations")
-        .select("storage_path")
+        .select("storage_path, time_of_day, season, weather")
         .eq("id", parentGenerationId)
         .eq("user_id", user.id)
         .single();
@@ -156,6 +160,12 @@ export async function POST(request: NextRequest) {
       }
       sourcePath = parentGen.storage_path;
       sourceBucket = BUCKET_GENERATIONS;
+
+      // Only flag as scene change if settings actually differ from parent
+      hasSceneChange =
+        (!!timeOfDay && timeOfDay !== (parentGen.time_of_day ?? "")) ||
+        (!!season && season !== (parentGen.season ?? "")) ||
+        (!!weather && weather !== (parentGen.weather ?? ""));
     } else {
       sourcePath = image.storage_path;
       sourceBucket = BUCKET_UPLOADS;
@@ -196,7 +206,20 @@ export async function POST(request: NextRequest) {
       weather,
       selectedPlants,
       selectedHardscape,
+      hasSceneChange,
     });
+
+    // Build library items metadata for persistence
+    const allLibItems = [...(selectedPlants ?? []), ...(selectedHardscape ?? [])];
+    const libraryItemsMeta = allLibItems.length > 0
+      ? allLibItems.map((item: { common_name: string; image_path?: string }) => ({
+          id: item.common_name,
+          name: item.common_name,
+          thumbnail_url: item.image_path
+            ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/plant-library/${item.image_path}`
+            : "",
+        }))
+      : null;
 
     const { error: insertError } = await admin.from("generations").insert({
       id: generationId,
@@ -205,6 +228,8 @@ export async function POST(request: NextRequest) {
       parent_generation_id: parentGenerationId || null,
       storage_path: storagePath,
       prompt,
+      custom_prompt: customPrompt?.trim() || null,
+      selected_library_items: libraryItemsMeta,
       style_preset: style || null,
       time_of_day: timeOfDay || null,
       season: season || null,
@@ -305,10 +330,14 @@ export async function POST(request: NextRequest) {
 
     // 9. Composite: blend original + Gemini result using the raw mask
     // This guarantees pixel-perfect preservation outside the masked area
-    // with a feathered boundary for natural blending
+    // with a feathered boundary for natural blending.
+    // EXCEPTION: when scene-wide settings changed (time/season/weather), skip
+    // compositing so the full Gemini output is used — otherwise compositing
+    // pastes the old lighting/atmosphere back over the non-masked areas.
     let finalImageBuffer: Buffer;
 
-    if (rawMaskBase64) {
+    if (rawMaskBase64 && !hasSceneChange) {
+      console.log("[inpaint] Compositing with mask — rawMaskBase64 length:", rawMaskBase64.length);
       const generatedBuffer = Buffer.from(generatedImageBase64, "base64");
       const maskBuffer = Buffer.from(rawMaskBase64, "base64");
       finalImageBuffer = await compositeWithMask(
@@ -317,7 +346,17 @@ export async function POST(request: NextRequest) {
         maskBuffer
       );
     } else {
-      finalImageBuffer = Buffer.from(generatedImageBase64, "base64");
+      if (hasSceneChange) {
+        console.log("[inpaint] Scene settings changed — using full Gemini output (no compositing)");
+      } else {
+        console.warn("[inpaint] No rawMaskBase64 — skipping composite, using raw Gemini output");
+      }
+      // Use full Gemini output, resize to match source dimensions
+      const generatedBuffer = Buffer.from(generatedImageBase64, "base64");
+      finalImageBuffer = await sharp(generatedBuffer)
+        .resize(sourceMeta.width!, sourceMeta.height!, { fit: "fill" })
+        .webp({ quality: 90 })
+        .toBuffer();
     }
 
     // 10. Upload final image to storage
@@ -365,6 +404,8 @@ export async function POST(request: NextRequest) {
         image_id: imageId,
         status: "completed",
         prompt,
+        custom_prompt: customPrompt?.trim() || null,
+        selected_library_items: libraryItemsMeta,
         style_preset: style || null,
         time_of_day: timeOfDay || null,
         season: season || null,

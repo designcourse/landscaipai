@@ -84,6 +84,8 @@ export interface Generation {
   parent_generation_id: string | null;
   storage_path: string;
   prompt: string;
+  custom_prompt: string | null;
+  selected_library_items: { id: string; name: string; thumbnail_url: string }[] | null;
   style_preset: string | null;
   time_of_day: string | null;
   season: string | null;

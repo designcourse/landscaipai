@@ -320,7 +320,7 @@ export function ProjectDetail({ project, images: initialImages, userId }: Projec
               className="group relative overflow-hidden rounded-lg border border-border bg-background"
             >
               <Link
-                href={`/generate?image=${image.id}`}
+                href={`/generate?project=${project.id}`}
                 className="block aspect-[4/3] bg-muted"
               >
                 {image.url ? (

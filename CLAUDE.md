@@ -39,8 +39,11 @@ npm run test      # Tests (framework TBD)
 - Photo upload (camera capture + file drop) organized into named Projects
 - AI landscape generation with 16 style presets + custom prompts
 - Generation settings: time of day, season, weather
-- In-painting canvas (mask + targeted prompt) — client-side masking only
+- **Infinite canvas UI** (Figma-like): zoom/pan, drag/resize, marquee multi-select, group drag
+- In-painting canvas (mask + targeted prompt) with scene-wide setting detection
+- Plant & hardscape reference library (zone-filtered, 550+ items with AI-generated thumbnails)
 - Iterative conversation per image with "start over" reset to original
+- Canvas image management: 3-dot menu (download, delete), Ctrl+C copy to clipboard, Delete key shortcut
 - Shareable project URLs (public, read-only)
 - Credit system: 1 credit = 1 operation (generate, inpaint, or re-prompt)
 - Free tier: 3 credits on signup (admin-configurable via `admin_settings` table)
@@ -55,7 +58,10 @@ npm run test      # Tests (framework TBD)
 - Stripe webhook idempotency via `processed_stripe_events` table.
 - Supabase RLS enforces data ownership at the database level. Uses `(SELECT auth.uid())` pattern.
 - In-painting masks are client-side only — translated to prompt context, not stored server-side.
-- Route groups: `(public)`, `(auth)`, `(protected)`, `(admin)` for access control.
+- In-painting with scene-wide setting changes (time/season/weather) skips mask compositing so the full Gemini output is used.
+- Generation API sends `imageConfig.imageSize` + aspect ratio prompt to prevent output stretching.
+- Canvas text metadata (tags, prompt, settings) fades out at low zoom (progressive disclosure) to prevent overlap.
+- Route groups: `(public)`, `(auth)`, `(protected)`, `(canvas)`, `(admin)` for access control.
 - Server components use `getAuthenticatedProfile()` from `src/lib/supabase/queries.ts` — wrapped in React `cache()` to deduplicate user+profile queries across components in a single request.
 
 ## Database
@@ -116,6 +122,13 @@ Trigger: `handle_new_user()` on `auth.users` INSERT — auto-creates profile + a
 | `src/types/index.ts` | All DB model TypeScript types |
 | `src/lib/gemini/prompts.ts` | 16 style presets + prompt builder |
 | `src/lib/stripe/config.ts` | Plan definitions (starter/pro/business) |
+| `src/components/generate/canvas-workspace.tsx` | Main canvas workspace (state, generation, deletion) |
+| `src/components/generate/canvas-image-card.tsx` | Canvas card (image + hover menu + metadata) |
+| `src/components/generate/infinite-canvas.tsx` | Zoom/pan/marquee canvas container |
+| `src/components/generate/canvas-bottom-bar.tsx` | Style/settings/prompt bar |
+| `src/components/generate/canvas-toolbar.tsx` | Top toolbar (nav, upload, credits) |
+| `src/hooks/use-canvas-positions.ts` | localStorage-backed card positions |
+| `src/hooks/use-canvas-viewport.ts` | Zoom/pan viewport state |
 
 ## Docs
 

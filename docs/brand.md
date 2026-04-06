@@ -7,7 +7,7 @@
 | `primary` | `#0F8000` | Primary brand green, CTAs, active states |
 | `primary-light` | `#2DA31E` | Hover states, secondary emphasis |
 | `primary-dark` | `#0A5C00` | Pressed states, dark accents |
-| `background` | `#FFFFFF` | Page background |
+| `background` | `#F9F2E7` | Page background (warm beige) |
 | `foreground` | `#171717` | Primary text |
 | `muted` | `#F5F5F5` | Muted backgrounds, cards, input fields |
 | `muted-foreground` | `#737373` | Secondary text, placeholders, captions |

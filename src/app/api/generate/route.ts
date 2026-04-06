@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
+import sharp from "sharp";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { deductCredit, refundCredit } from "@/lib/utils/credits";
@@ -7,6 +8,17 @@ import { buildPrompt } from "@/lib/gemini/prompts";
 import { getGenerationPath, BUCKET_GENERATIONS, BUCKET_UPLOADS, fetchLibraryImageParts } from "@/lib/utils/storage";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+
+/**
+ * Determine the closest Gemini imageSize for a given resolution.
+ */
+function getImageSize(width: number, height: number): string {
+  const longest = Math.max(width, height);
+  if (longest <= 512) return "512px";
+  if (longest <= 1024) return "1K";
+  if (longest <= 2048) return "2K";
+  return "4K";
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -93,17 +105,36 @@ export async function POST(request: NextRequest) {
     }
 
     const arrayBuffer = await fileData.arrayBuffer();
-    const base64Image = Buffer.from(arrayBuffer).toString("base64");
+    const sourceBuffer = Buffer.from(arrayBuffer);
+    const base64Image = sourceBuffer.toString("base64");
     const mimeType = sourcePath.endsWith(".png")
       ? "image/png"
       : sourcePath.endsWith(".webp")
         ? "image/webp"
         : "image/jpeg";
 
+    // Get source image dimensions for aspect ratio preservation
+    const sourceMeta = await sharp(sourceBuffer).metadata();
+    const sourceWidth = sourceMeta.width ?? 1024;
+    const sourceHeight = sourceMeta.height ?? 1024;
+    const imageSize = getImageSize(sourceWidth, sourceHeight);
+
     // 5. Create generation record (pending)
     const generationId = crypto.randomUUID();
     const storagePath = getGenerationPath(user.id, projectId, generationId);
-    const prompt = buildPrompt({ style, timeOfDay, season, weather, customPrompt, selectedPlants, selectedHardscape });
+    const prompt = buildPrompt({ style, timeOfDay, season, weather, customPrompt, selectedPlants, selectedHardscape, sourceWidth, sourceHeight });
+
+    // Build library items metadata for persistence
+    const allItems = [...(selectedPlants ?? []), ...(selectedHardscape ?? [])];
+    const libraryItemsMeta = allItems.length > 0
+      ? allItems.map((item: { common_name: string; image_path?: string }) => ({
+          id: item.common_name,
+          name: item.common_name,
+          thumbnail_url: item.image_path
+            ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/plant-library/${item.image_path}`
+            : "",
+        }))
+      : null;
 
     const { error: insertError } = await admin.from("generations").insert({
       id: generationId,
@@ -112,6 +143,8 @@ export async function POST(request: NextRequest) {
       parent_generation_id: parentGenerationId || null,
       storage_path: storagePath,
       prompt,
+      custom_prompt: customPrompt || null,
+      selected_library_items: libraryItemsMeta,
       style_preset: style || null,
       time_of_day: timeOfDay || null,
       season: season || null,
@@ -172,6 +205,12 @@ export async function POST(request: NextRequest) {
             parts,
           },
         ],
+        config: {
+          responseModalities: ["TEXT", "IMAGE"],
+          imageConfig: {
+            imageSize,
+          },
+        },
       });
 
       for (const part of response.candidates?.[0]?.content?.parts ?? []) {
@@ -239,6 +278,8 @@ export async function POST(request: NextRequest) {
         image_id: imageId,
         status: "completed",
         prompt,
+        custom_prompt: customPrompt || null,
+        selected_library_items: libraryItemsMeta,
         style_preset: style || null,
         time_of_day: timeOfDay || null,
         season: season || null,

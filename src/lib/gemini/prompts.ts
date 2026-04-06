@@ -187,6 +187,8 @@ export interface GenerationParams {
   customPrompt?: string;
   selectedPlants?: SelectedPlant[];
   selectedHardscape?: SelectedHardscape[];
+  sourceWidth?: number;
+  sourceHeight?: number;
 }
 
 export interface InpaintParams {
@@ -197,6 +199,7 @@ export interface InpaintParams {
   weather?: string;
   selectedPlants?: SelectedPlant[];
   selectedHardscape?: SelectedHardscape[];
+  hasSceneChange?: boolean;
 }
 
 const SYSTEM_CONTEXT =
@@ -220,7 +223,7 @@ export function buildPrompt(params: GenerationParams): string {
     const list = formatItemList(params.selectedPlants, true);
     parts.push(
       hasReferenceImages(params.selectedPlants)
-        ? `Include the following specific plants in the design. Reference images are provided in order — match their appearance closely:\n${list}`
+        ? `Include the following specific plants in the design. Reference images are provided to show the species — use them to identify the correct plant type, leaf shape, color, and flower style, but each individual plant placed in the scene MUST look naturally unique (vary the size, shape, branching pattern, and maturity). Do NOT duplicate or clone the same plant image multiple times. Place plants in contextually appropriate locations (in garden beds, lawns, borders) with realistic spacing — never overlapping structures or pressed against the house:\n${list}`
         : `Include the following specific plants in the design: ${list}.`
     );
   }
@@ -229,7 +232,7 @@ export function buildPrompt(params: GenerationParams): string {
     const list = formatItemList(params.selectedHardscape, false);
     parts.push(
       hasReferenceImages(params.selectedHardscape)
-        ? `Include the following hardscape elements. Reference images are provided in order — match their appearance closely:\n${list}`
+        ? `Include the following hardscape elements. Reference images are provided to show the material and style — use them as a guide for texture, color, and type, but integrate each element naturally into the scene with realistic scale and placement:\n${list}`
         : `Include the following hardscape elements: ${list}.`
     );
   }
@@ -239,6 +242,12 @@ export function buildPrompt(params: GenerationParams): string {
   if (params.weather) parts.push(`Weather conditions: ${params.weather}.`);
   if (params.customPrompt) parts.push(params.customPrompt);
 
+  if (params.sourceWidth && params.sourceHeight) {
+    parts.push(
+      `CRITICAL: The output image MUST have exactly the same aspect ratio as the input image (${params.sourceWidth}×${params.sourceHeight}). Do not crop, stretch, widen, or change the framing in any way. The camera angle, field of view, and composition must remain identical.`
+    );
+  }
+
   parts.push(
     "Keep the house structure, driveway, and all non-landscape elements completely intact. Make it look photorealistic and professional."
   );
@@ -247,12 +256,25 @@ export function buildPrompt(params: GenerationParams): string {
 }
 
 export function buildInpaintPrompt(params: InpaintParams): string {
+  const sceneWide = params.hasSceneChange && (params.timeOfDay || params.season || params.weather);
+
   const parts = [
     "Generate an image: Edit this photo. The green highlighted area marks the region to change.",
     `Inside the green area: ${params.customPrompt}`,
-    "The new content MUST match the existing photo's lighting, color temperature, brightness, contrast, shadows, and perspective. Objects must be correctly scaled relative to structures in the scene — respect the depth and distance in the image.",
-    "Outside the green area: keep everything exactly as-is — same plants, same structures, same lighting, same perspective, same camera angle.",
   ];
+
+  if (sceneWide) {
+    // Scene-wide settings changed — tell Gemini to apply them to the ENTIRE image
+    parts.push(
+      "Objects in the green area must be correctly scaled relative to structures in the scene — respect the depth and distance in the image.",
+      "Outside the green area: keep the same plants, structures, composition, and camera angle, but apply the scene-wide lighting/atmosphere changes (time of day, season, weather listed below) to the ENTIRE image — not just the masked area. The whole scene must look consistent."
+    );
+  } else {
+    parts.push(
+      "The new content MUST match the existing photo's lighting, color temperature, brightness, contrast, shadows, and perspective. Objects must be correctly scaled relative to structures in the scene — respect the depth and distance in the image.",
+      "Outside the green area: keep everything exactly as-is — same plants, same structures, same lighting, same perspective, same camera angle."
+    );
+  }
 
   if (params.style) {
     const preset = STYLE_PRESETS.find((p) => p.id === params.style);
@@ -267,7 +289,7 @@ export function buildInpaintPrompt(params: InpaintParams): string {
     const list = formatItemList(params.selectedPlants, true);
     parts.push(
       hasReferenceImages(params.selectedPlants)
-        ? `Use these specific plants in the edited area. Reference images are provided in order — match their appearance closely:\n${list}`
+        ? `Use these specific plants in the edited area. Reference images show the species — match the plant type, leaf shape, color, and flower style, but each individual plant MUST look naturally unique (vary size, shape, branching, maturity). Do NOT clone the reference image:\n${list}`
         : `Use these specific plants in the edited area: ${list}.`
     );
   }
@@ -276,7 +298,7 @@ export function buildInpaintPrompt(params: InpaintParams): string {
     const list = formatItemList(params.selectedHardscape, false);
     parts.push(
       hasReferenceImages(params.selectedHardscape)
-        ? `Use these hardscape elements in the edited area. Reference images are provided in order — match their appearance closely:\n${list}`
+        ? `Use these hardscape elements in the edited area. Reference images show the material and style — match the texture and type, but integrate naturally into the scene:\n${list}`
         : `Use these hardscape elements in the edited area: ${list}.`
     );
   }
@@ -285,9 +307,15 @@ export function buildInpaintPrompt(params: InpaintParams): string {
   if (params.season) parts.push(`Season: ${params.season}.`);
   if (params.weather) parts.push(`Weather conditions: ${params.weather}.`);
 
-  parts.push(
-    "Maintain the exact same camera angle, lens perspective, and depth of field as the original photo. Only modify what is inside the green highlighted region."
-  );
+  if (sceneWide) {
+    parts.push(
+      "Maintain the exact same camera angle, lens perspective, and depth of field as the original photo. Apply the time/season/weather changes uniformly across the entire scene."
+    );
+  } else {
+    parts.push(
+      "Maintain the exact same camera angle, lens perspective, and depth of field as the original photo. Only modify what is inside the green highlighted region."
+    );
+  }
 
   return parts.join(" ");
 }

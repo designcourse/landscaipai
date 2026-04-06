@@ -14,9 +14,11 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  const isDev = process.env.NODE_ENV === "development";
+
   return NextResponse.json(data, {
     headers: {
-      "Cache-Control": "public, max-age=3600, s-maxage=3600",
+      "Cache-Control": isDev ? "no-store" : "public, max-age=3600, s-maxage=3600",
     },
   });
 }

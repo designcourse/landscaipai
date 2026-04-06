@@ -5,7 +5,7 @@
   --color-primary: #0F8000;
   --color-primary-light: #2DA31E;
   --color-primary-dark: #0A5C00;
-  --color-background: #FFFFFF;
+  --color-background: #F9F2E7;
   --color-foreground: #171717;
   --color-muted: #F5F5F5;
   --color-muted-foreground: #737373;
@@ -36,6 +36,19 @@
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
   --shadow-md: 0 4px 6px rgba(0,0,0,0.07);
   --shadow-lg: 0 10px 15px rgba(0,0,0,0.1);
+
+  /* Canvas — infinite canvas UI */
+  --color-canvas-bg: #f9f2e7;
+  --color-canvas-toolbar-border: rgba(224, 214, 200, 0.6);
+  --color-canvas-card-bg: rgba(255, 255, 255, 0.88);
+  --color-canvas-input-bg: #fffbf5;
+  --color-canvas-input-border: #e0d6c8;
+  --color-canvas-chip-bg: #f9f2e7;
+  --color-canvas-separator: #e0d6c8;
+  --color-canvas-label: #928f88;
+  --color-credits-badge-bg: #e8f5e5;
+  --radius-toolbar: 20px;
+  --shadow-toolbar: 0px 12px 22.4px 0px rgba(0, 0, 0, 0.12);
 }
 
 body {

@@ -385,45 +385,49 @@ export function InpaintCanvas({
     }
     if (!hasMask) return;
 
-    // Composite: image + mask overlay (for Gemini prompt)
-    const comp = document.createElement("canvas");
-    comp.width = img.naturalWidth;
-    comp.height = img.naturalHeight;
-    const ctx = comp.getContext("2d")!;
+    try {
+      // Composite: image + mask overlay (for Gemini prompt)
+      const comp = document.createElement("canvas");
+      comp.width = img.naturalWidth;
+      comp.height = img.naturalHeight;
+      const ctx = comp.getContext("2d")!;
 
-    ctx.drawImage(img, 0, 0);
-    ctx.globalAlpha = 0.5;
-    ctx.drawImage(mask, 0, 0);
-    ctx.globalAlpha = 1;
+      ctx.drawImage(img, 0, 0);
+      ctx.globalAlpha = 0.5;
+      ctx.drawImage(mask, 0, 0);
+      ctx.globalAlpha = 1;
 
-    const overlayBase64 = comp.toDataURL("image/jpeg", 0.85);
+      const overlayBase64 = comp.toDataURL("image/jpeg", 0.85);
 
-    // Raw mask: white where painted, black elsewhere (for server-side compositing)
-    const rawMask = document.createElement("canvas");
-    rawMask.width = img.naturalWidth;
-    rawMask.height = img.naturalHeight;
-    const rawCtx = rawMask.getContext("2d")!;
+      // Raw mask: white where painted, black elsewhere (for server-side compositing)
+      const rawMask = document.createElement("canvas");
+      rawMask.width = img.naturalWidth;
+      rawMask.height = img.naturalHeight;
+      const rawCtx = rawMask.getContext("2d")!;
 
-    // Fill black background
-    rawCtx.fillStyle = "#000000";
-    rawCtx.fillRect(0, 0, rawMask.width, rawMask.height);
+      // Fill black background
+      rawCtx.fillStyle = "#000000";
+      rawCtx.fillRect(0, 0, rawMask.width, rawMask.height);
 
-    // Read the mask canvas pixels — anywhere with alpha > 0 becomes white
-    const maskPixels = maskCtx.getImageData(0, 0, mask.width, mask.height);
-    const rawPixels = rawCtx.getImageData(0, 0, rawMask.width, rawMask.height);
-    for (let i = 0; i < maskPixels.data.length; i += 4) {
-      if (maskPixels.data[i + 3] > 0) {
-        rawPixels.data[i] = 255;     // R
-        rawPixels.data[i + 1] = 255; // G
-        rawPixels.data[i + 2] = 255; // B
-        rawPixels.data[i + 3] = 255; // A
+      // Read the mask canvas pixels — anywhere with alpha > 0 becomes white
+      const maskPixels = maskCtx.getImageData(0, 0, mask.width, mask.height);
+      const rawPixels = rawCtx.getImageData(0, 0, rawMask.width, rawMask.height);
+      for (let i = 0; i < maskPixels.data.length; i += 4) {
+        if (maskPixels.data[i + 3] > 0) {
+          rawPixels.data[i] = 255;     // R
+          rawPixels.data[i + 1] = 255; // G
+          rawPixels.data[i + 2] = 255; // B
+          rawPixels.data[i + 3] = 255; // A
+        }
       }
+      rawCtx.putImageData(rawPixels, 0, 0);
+
+      const rawMaskBase64 = rawMask.toDataURL("image/png");
+
+      onConfirm(overlayBase64, rawMaskBase64);
+    } catch (err) {
+      console.error("[InpaintCanvas] Failed to export mask — possible CORS/tainted canvas:", err);
     }
-    rawCtx.putImageData(rawPixels, 0, 0);
-
-    const rawMaskBase64 = rawMask.toDataURL("image/png");
-
-    onConfirm(overlayBase64, rawMaskBase64);
   }
 
   const hasStrokes = strokeCount > 0;

@@ -36,7 +36,7 @@ export function PlantBrowser({
     let cancelled = false;
     async function fetchItems() {
       try {
-        const res = await fetch("/api/library");
+        const res = await fetch("/api/library", { cache: "no-store" });
         if (!res.ok) throw new Error("Failed to fetch");
         const data = await res.json();
         if (!cancelled) {
