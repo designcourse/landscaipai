@@ -17,6 +17,16 @@ const FINALIZE_CREDIT_COST = 1;
 const MAX_ASSETS = 6;
 const MAX_TEXT_LENGTH = 500;
 
+// New AWS accounts have a default Lambda concurrency limit of 10. Remotion
+// renders by splitting the composition into chunks where each chunk = one
+// Lambda invocation. For our ~450-frame composition (8s veo + 7s freeze at
+// 30fps), framesPerLambda=100 yields ~5 chunks + 1 orchestrator = ~6 Lambdas
+// — comfortably under the limit. Once the AWS quota is increased (run
+// `npx remotion lambda quotas increase`), this can be lowered for faster
+// renders. Lower = more parallelism = faster wall-clock but more concurrent
+// Lambdas.
+const FRAMES_PER_LAMBDA = 100;
+
 type FinalizeRequestBody = {
   videoGenerationId: string;
   assets: { name: string; thumbnailUrl: string }[];
@@ -329,6 +339,7 @@ export async function POST(req: NextRequest) {
       imageFormat: "jpeg",
       maxRetries: 1,
       privacy: "private",
+      framesPerLambda: FRAMES_PER_LAMBDA,
       webhook: webhookSecret
         ? {
             url: `${appUrl}/api/finalize-video/webhook`,
