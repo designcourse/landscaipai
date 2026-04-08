@@ -1,5 +1,8 @@
 import { redirect } from "next/navigation";
-import { getAuthenticatedProfile } from "@/lib/supabase/queries";
+import {
+  getAuthenticatedProfile,
+  getCompanySettings,
+} from "@/lib/supabase/queries";
 import { AccountSettings } from "@/components/account/account-settings";
 
 export const metadata = { title: "Account Settings" };
@@ -11,9 +14,16 @@ export default async function AccountPage() {
     redirect("/login");
   }
 
+  const { settings: companySettings, logoUrl: initialLogoUrl } =
+    await getCompanySettings();
+
   return (
     <main className="px-element py-section">
-      <AccountSettings user={user} profile={profile} />
+      <AccountSettings
+        user={user}
+        companySettings={companySettings}
+        initialLogoUrl={initialLogoUrl}
+      />
     </main>
   );
 }

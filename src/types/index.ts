@@ -139,9 +139,52 @@ export interface VideoGeneration {
   width: number | null;
   height: number | null;
   storage_path: string | null;
+  // Actual media metadata probed from the rendered MP4 at completion.
+  // Used by the Remotion finalize composition for frame-accurate timing.
+  actual_duration_seconds: number | null;
+  actual_fps: number | null;
+  actual_width: number | null;
+  actual_height: number | null;
   status: VideoGenerationStatus;
   error_message: string | null;
   cost_credits: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// ===== Finalize Video feature =====
+
+export interface CompanySettings {
+  user_id: string;
+  company_name: string | null;
+  company_phone: string | null;
+  logo_path: string | null;
+  default_note: string | null;
+  updated_at: string;
+}
+
+export type VideoFinalizationStatus =
+  | "pending"
+  | "rendering"
+  | "downloading"
+  | "completed"
+  | "failed";
+
+export interface VideoFinalization {
+  id: string;
+  user_id: string;
+  video_generation_id: string;
+  status: VideoFinalizationStatus;
+  lambda_render_id: string | null;
+  lambda_bucket_name: string | null;
+  lambda_function_name: string | null;
+  lambda_serve_url: string | null;
+  output_storage_path: string | null;
+  input_props_snapshot: Record<string, unknown>;
+  input_props_hash: string;
+  cost_credits: number;
+  cost_cents: number | null;
+  error_message: string | null;
   created_at: string;
   updated_at: string;
 }

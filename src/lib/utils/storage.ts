@@ -5,6 +5,8 @@ export const BUCKET_UPLOADS = "uploads";
 export const BUCKET_THUMBNAILS = "thumbnails";
 export const BUCKET_GENERATIONS = "generations";
 export const BUCKET_VIDEOS = "videos";
+export const BUCKET_COMPANY_LOGOS = "company-logos";
+export const BUCKET_FINALIZED_VIDEOS = "finalized-videos";
 
 // Signed URL expiry (1 hour)
 export const SIGNED_URL_EXPIRY = 3600;
@@ -92,4 +94,19 @@ export function getVideoPath(
   videoGenerationId: string
 ) {
   return `${userId}/${projectId}/${videoGenerationId}.mp4`;
+}
+
+// Path within company-logos bucket: {user_id}/logo.{ext}
+// (no project_id — branding is global per user)
+export function getCompanyLogoPath(userId: string, ext: string) {
+  return `${userId}/logo.${ext}`;
+}
+
+// Path within finalized-videos bucket: {user_id}/{project_id}/{finalization_id}.mp4
+export function getFinalizedVideoPath(
+  userId: string,
+  projectId: string,
+  finalizationId: string
+) {
+  return `${userId}/${projectId}/${finalizationId}.mp4`;
 }
