@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { parseMedia } from "@remotion/media-parser";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { refundCredits } from "@/lib/utils/credits";
@@ -198,22 +199,54 @@ export async function GET(
       return NextResponse.json({ error: "Failed to save video" }, { status: 500 });
     }
 
-    // Mark completed
+    // Generate signed URL once and reuse for both probing and the response.
+    const { data: urlData } = await admin.storage
+      .from(BUCKET_VIDEOS)
+      .createSignedUrl(storagePath, SIGNED_URL_EXPIRY);
+
+    // Probe actual media metadata via the signed URL. parseMedia uses HTTP
+    // Range requests so it only reads container headers, not the full file.
+    // Failures are non-fatal — the finalize endpoint has a fallback parser.
+    let actualDurationSeconds: number | null = null;
+    let actualFps: number | null = null;
+    let actualWidth: number | null = null;
+    let actualHeight: number | null = null;
+    if (urlData?.signedUrl) {
+      try {
+        const probed = await parseMedia({
+          src: urlData.signedUrl,
+          fields: {
+            slowDurationInSeconds: true,
+            fps: true,
+            dimensions: true,
+          },
+          acknowledgeRemotionLicense: true,
+        });
+        actualDurationSeconds = probed.slowDurationInSeconds ?? null;
+        actualFps = probed.fps ?? null;
+        actualWidth = probed.dimensions?.width ?? null;
+        actualHeight = probed.dimensions?.height ?? null;
+      } catch (probeErr) {
+        console.warn("parseMedia failed for video", id, probeErr);
+      }
+    }
+
+    // Mark completed (with probed metadata if available)
     const { data: updated } = await admin
       .from("video_generations")
       .update({
         status: "completed",
         storage_path: storagePath,
         operation_metadata: null,
+        actual_duration_seconds: actualDurationSeconds,
+        actual_fps: actualFps,
+        actual_width: actualWidth,
+        actual_height: actualHeight,
         updated_at: new Date().toISOString(),
       })
       .eq("id", id)
       .select()
       .single();
-
-    const { data: urlData } = await admin.storage
-      .from(BUCKET_VIDEOS)
-      .createSignedUrl(storagePath, SIGNED_URL_EXPIRY);
 
     return NextResponse.json({
       videoGeneration: { ...(updated ?? row), url: urlData?.signedUrl ?? "" },
