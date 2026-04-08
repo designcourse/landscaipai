@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 export const BUCKET_UPLOADS = "uploads";
 export const BUCKET_THUMBNAILS = "thumbnails";
 export const BUCKET_GENERATIONS = "generations";
+export const BUCKET_VIDEOS = "videos";
 
 // Signed URL expiry (1 hour)
 export const SIGNED_URL_EXPIRY = 3600;
@@ -83,4 +84,12 @@ export function getGenerationPath(
   generationId: string
 ) {
   return `${userId}/${projectId}/${generationId}.webp`;
+}
+
+export function getVideoPath(
+  userId: string,
+  projectId: string,
+  videoGenerationId: string
+) {
+  return `${userId}/${projectId}/${videoGenerationId}.mp4`;
 }

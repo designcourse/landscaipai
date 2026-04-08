@@ -40,7 +40,7 @@
   /* Canvas — infinite canvas UI */
   --color-canvas-bg: #f9f2e7;
   --color-canvas-toolbar-border: rgba(224, 214, 200, 0.6);
-  --color-canvas-card-bg: rgba(255, 255, 255, 0.88);
+  --color-canvas-card-bg: #ffffff;
   --color-canvas-input-bg: #fffbf5;
   --color-canvas-input-border: #e0d6c8;
   --color-canvas-chip-bg: #f9f2e7;

@@ -189,6 +189,7 @@ export interface GenerationParams {
   selectedHardscape?: SelectedHardscape[];
   sourceWidth?: number;
   sourceHeight?: number;
+  hasReferenceAttachments?: boolean;
 }
 
 export interface InpaintParams {
@@ -200,6 +201,7 @@ export interface InpaintParams {
   selectedPlants?: SelectedPlant[];
   selectedHardscape?: SelectedHardscape[];
   hasSceneChange?: boolean;
+  hasReferenceAttachments?: boolean;
 }
 
 const SYSTEM_CONTEXT =
@@ -240,6 +242,12 @@ export function buildPrompt(params: GenerationParams): string {
   if (params.timeOfDay) parts.push(`Time of day: ${params.timeOfDay}.`);
   if (params.season) parts.push(`Season: ${params.season}.`);
   if (params.weather) parts.push(`Weather conditions: ${params.weather}.`);
+  if (params.hasReferenceAttachments) {
+    parts.push(
+      "Additional reference images have been attached by the user. Use them as visual context — they may show specific features, materials, styles, or elements the user wants incorporated or matched in the design. Follow the user's custom instructions regarding how to use these references."
+    );
+  }
+
   if (params.customPrompt) parts.push(params.customPrompt);
 
   if (params.sourceWidth && params.sourceHeight) {
@@ -300,6 +308,12 @@ export function buildInpaintPrompt(params: InpaintParams): string {
       hasReferenceImages(params.selectedHardscape)
         ? `Use these hardscape elements in the edited area. Reference images show the material and style — match the texture and type, but integrate naturally into the scene:\n${list}`
         : `Use these hardscape elements in the edited area: ${list}.`
+    );
+  }
+
+  if (params.hasReferenceAttachments) {
+    parts.push(
+      "Additional reference images have been attached by the user. Use them as visual context for the edit — they may show specific features, materials, styles, or elements to incorporate into the masked area. Follow the user's prompt regarding how to use these references."
     );
   }
 

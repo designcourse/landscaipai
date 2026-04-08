@@ -8,7 +8,7 @@ type GenerationWithUrl = Generation & { url: string };
 
 export interface CanvasItem {
   id: string;
-  type: "original" | "generation";
+  type: "original" | "generation" | "video";
   imageId: string;
   url: string;
   naturalWidth: number;
@@ -18,8 +18,14 @@ export interface CanvasItem {
   libraryTags?: { name: string; thumbnailUrl: string; id?: string }[];
   userPrompt?: string; // The user's custom prompt only (not the system prompt)
   settingsSummary?: string; // e.g. "Summer · Partly Cloudy"
+  // For video items: "generating" shows start-frame poster with long-loading notice
   status?: "ready" | "generating" | "revealing";
   sourceUrl?: string; // URL of the source image (shown during generation animation)
+  // Video-specific fields
+  durationSeconds?: number;    // for display ("8s")
+  videoModel?: string;         // for display ("Veo 3.1 Fast")
+  cameraPreset?: string;       // for display
+  transitionPreset?: string;   // for display
 }
 
 interface CanvasImageCardProps {
@@ -127,6 +133,7 @@ export const CanvasImageCard = memo(function CanvasImageCard({
 
   const isGenerating = item.status === "generating";
   const isRevealing = item.status === "revealing";
+  const isVideo = item.type === "video";
 
   // Progressive disclosure: fade out metadata below images at low zoom to prevent overlap.
   // Cards are only 30px apart, so counter-scaling text causes immediate overlap.
@@ -143,7 +150,27 @@ export const CanvasImageCard = memo(function CanvasImageCard({
 
   // Edit Region button is inside the image (overflow-hidden), so counter-scaling is safe.
   const editScale = Math.max(1, Math.min(13 / (14 * zoom), 2.0));
-  const showEditRegion = hovered && !isGenerating && !isRevealing && zoom >= 0.4;
+  // Images: show Edit Region. Videos: show only a download button.
+  const showEditRegion = hovered && !isGenerating && !isRevealing && !isVideo && zoom >= 0.4;
+  const showVideoDownload = hovered && !isGenerating && isVideo && zoom >= 0.4;
+
+  // Trigger a download of the current item (image or video)
+  const triggerDownload = useCallback(() => {
+    const a = document.createElement("a");
+    a.href = item.url;
+    const ext = isVideo
+      ? "mp4"
+      : item.type === "original"
+        ? "jpg"
+        : "webp";
+    const prefix = isVideo ? "video" : item.type === "original" ? "original" : "generation";
+    a.download = `${prefix}-${item.id.slice(0, 8)}.${ext}`;
+    a.target = "_blank";
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }, [item.id, item.url, item.type, isVideo]);
 
   return (
     <div
@@ -159,8 +186,8 @@ export const CanvasImageCard = memo(function CanvasImageCard({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => { setHovered(false); setMenuOpen(false); }}
     >
-      {/* Title (generations only) */}
-      {item.type === "generation" && item.title && (
+      {/* Title (generations + videos) */}
+      {(item.type === "generation" || item.type === "video") && item.title && (
         <p
           className="mb-3 text-xs font-bold uppercase tracking-wider"
           style={{
@@ -192,8 +219,8 @@ export const CanvasImageCard = memo(function CanvasImageCard({
           />
         )}
 
-        {/* Actual image */}
-        {!isGenerating && (
+        {/* Actual image (non-video) */}
+        {!isGenerating && !isVideo && (
           <img
             src={item.url}
             alt={item.title || (item.type === "original" ? "Original photo" : "Generated result")}
@@ -212,6 +239,25 @@ export const CanvasImageCard = memo(function CanvasImageCard({
           />
         )}
 
+        {/* Video element — muted because Veo 3.1 via the Gemini Developer API
+            always generates synchronized audio (the generateAudio config field
+            is Vertex-AI-only and is rejected by the Gemini API). Muting at the
+            element is the only reliable way to prevent audio playback. */}
+        {!isGenerating && isVideo && (
+          <video
+            src={item.url}
+            className="h-full w-full object-cover"
+            controls
+            controlsList="nodownload"
+            muted
+            playsInline
+            preload="metadata"
+            poster={item.sourceUrl}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+          />
+        )}
+
         {/* Shimmer animation overlay during generation */}
         {isGenerating && (
           <div
@@ -224,9 +270,61 @@ export const CanvasImageCard = memo(function CanvasImageCard({
           />
         )}
 
+        {/* Long-running notice for video generations in progress */}
+        {isGenerating && isVideo && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <div
+              className="flex flex-col items-center gap-1 rounded-lg px-4 py-3 text-center"
+              style={{
+                backgroundColor: "rgba(0, 0, 0, 0.55)",
+                color: "white",
+                transform: titleScale > 1 ? `scale(${titleScale})` : undefined,
+              }}
+            >
+              <span className="text-sm font-semibold">Generating video…</span>
+              <span className="text-xs opacity-80">This may take a few minutes</span>
+            </div>
+          </div>
+        )}
+
         {/* Selection outline */}
         {selected && (
           <div className="pointer-events-none absolute inset-0 rounded-md border-2 border-blue-500" />
+        )}
+
+        {/* Video hover action: circular white download button only */}
+        {showVideoDownload && (
+          <div
+            className="absolute right-4 top-4"
+            style={{
+              transform: editScale > 1 ? `scale(${editScale})` : undefined,
+              transformOrigin: "top right",
+            }}
+          >
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                triggerDownload();
+              }}
+              className="flex h-[38px] w-[38px] items-center justify-center rounded-full bg-white shadow-lg transition-shadow hover:shadow-xl"
+              title="Download video"
+              aria-label="Download video"
+            >
+              <svg
+                className="h-[18px] w-[18px]"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="#1a1a1a"
+                strokeWidth={2.2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                />
+              </svg>
+            </button>
+          </div>
         )}
 
         {/* Hover action buttons (Edit Region + 3-dot menu) */}
@@ -322,8 +420,9 @@ export const CanvasImageCard = memo(function CanvasImageCard({
 
       {/* Resize handles (selected only) — corners hug the image, not the metadata */}
       {selected && !isGenerating && (() => {
-        // Title adds ~28px above the image for generations (text-xs + mb-3)
-        const titleOffset = item.type === "generation" && item.title ? 28 : 0;
+        // Title adds ~28px above the image for generations + videos (text-xs + mb-3)
+        const titleOffset =
+          (item.type === "generation" || item.type === "video") && item.title ? 28 : 0;
         const imgTop = titleOffset - RESIZE_HANDLE_SIZE / 2;
         const imgBottom = titleOffset + position.height - RESIZE_HANDLE_SIZE / 2;
         return (
@@ -394,8 +493,10 @@ export const CanvasImageCard = memo(function CanvasImageCard({
         </div>
       )}
 
-      {/* Prompt + settings (generations only) — fade out when zoomed out */}
-      {detailOpacity > 0 && item.type === "generation" && (item.userPrompt || item.settingsSummary) && (
+      {/* Prompt + settings (generations + videos) — fade out when zoomed out */}
+      {detailOpacity > 0 &&
+        (item.type === "generation" || item.type === "video") &&
+        (item.userPrompt || item.settingsSummary) && (
         <div className="mt-7" style={{ opacity: detailOpacity }}>
           {item.userPrompt && (
             <>
