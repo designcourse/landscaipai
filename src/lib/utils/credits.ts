@@ -22,13 +22,18 @@ export async function refundCredit(userId: string, generationId: string) {
 }
 
 /**
- * Variable-cost credit deduction (for video generation).
+ * Variable-cost credit deduction (for video generation + finalization).
  * Returns true if the deduction succeeded, false if insufficient balance.
  */
 export async function deductCredits(
   userId: string,
   amount: number,
-  opts: { videoGenerationId?: string; generationId?: string; description?: string } = {}
+  opts: {
+    videoGenerationId?: string;
+    generationId?: string;
+    videoFinalizationId?: string;
+    description?: string;
+  } = {}
 ) {
   const supabase = createAdminClient();
   const { data, error } = await supabase.rpc("deduct_credits", {
@@ -37,6 +42,7 @@ export async function deductCredits(
     p_video_generation_id: opts.videoGenerationId ?? null,
     p_generation_id: opts.generationId ?? null,
     p_description: opts.description ?? "AI generation",
+    p_video_finalization_id: opts.videoFinalizationId ?? null,
   });
 
   if (error) throw error;
@@ -46,7 +52,12 @@ export async function deductCredits(
 export async function refundCredits(
   userId: string,
   amount: number,
-  opts: { videoGenerationId?: string; generationId?: string; description?: string } = {}
+  opts: {
+    videoGenerationId?: string;
+    generationId?: string;
+    videoFinalizationId?: string;
+    description?: string;
+  } = {}
 ) {
   const supabase = createAdminClient();
   const { error } = await supabase.rpc("refund_credits", {
@@ -55,6 +66,7 @@ export async function refundCredits(
     p_video_generation_id: opts.videoGenerationId ?? null,
     p_generation_id: opts.generationId ?? null,
     p_description: opts.description ?? "Failed generation refund",
+    p_video_finalization_id: opts.videoFinalizationId ?? null,
   });
 
   if (error) throw error;

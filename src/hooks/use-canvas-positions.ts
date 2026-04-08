@@ -20,8 +20,9 @@ const GENERATION_VERTICAL_GAP = 160; // Extra space for metadata (title + tags +
 
 export interface CanvasItemSeed {
   id: string;
-  // Videos share generation layout semantics — treat them as "generation" for auto-layout.
-  type: "original" | "generation" | "video";
+  // Videos and finalized videos share generation layout semantics —
+  // they're auto-laid-out as siblings to the right of their source image.
+  type: "original" | "generation" | "video" | "finalized_video";
   imageId: string; // parent image ID (for generations/videos, their source)
   naturalWidth: number;
   naturalHeight: number;
@@ -35,7 +36,11 @@ function computeAutoLayout(items: CanvasItemSeed[]): Record<string, ItemPosition
   const generationsByImage: Record<string, CanvasItemSeed[]> = {};
 
   for (const item of items) {
-    if (item.type === "generation" || item.type === "video") {
+    if (
+      item.type === "generation" ||
+      item.type === "video" ||
+      item.type === "finalized_video"
+    ) {
       if (!generationsByImage[item.imageId]) generationsByImage[item.imageId] = [];
       generationsByImage[item.imageId].push(item);
     }
@@ -73,10 +78,12 @@ function computeAutoLayout(items: CanvasItemSeed[]): Record<string, ItemPosition
     currentX = (gens.length > 0 ? genX : currentX + width) + HORIZONTAL_GAP;
   }
 
-  // Handle orphan generations/videos (whose parent image isn't in originals list)
+  // Handle orphan generations/videos/finalizations (whose parent image isn't in originals list)
   const orphanGens = items.filter(
     (i) =>
-      (i.type === "generation" || i.type === "video") &&
+      (i.type === "generation" ||
+        i.type === "video" ||
+        i.type === "finalized_video") &&
       !originals.some((o) => o.id === i.imageId)
   );
   for (const gen of orphanGens) {
