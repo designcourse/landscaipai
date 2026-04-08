@@ -45,7 +45,20 @@ export async function POST(request: NextRequest) {
       parentGenerationId,
       selectedPlants,
       selectedHardscape,
-    } = body;
+      referenceImages,
+    } = body as {
+      imageId: string;
+      projectId: string;
+      style?: string;
+      timeOfDay?: string;
+      season?: string;
+      weather?: string;
+      customPrompt?: string;
+      parentGenerationId?: string;
+      selectedPlants?: { common_name: string; scientific_name: string | null; image_path?: string | null }[];
+      selectedHardscape?: { common_name: string; image_path?: string | null }[];
+      referenceImages?: { base64: string; mimeType: string }[];
+    };
 
     if (!imageId || !projectId) {
       return NextResponse.json(
@@ -122,12 +135,12 @@ export async function POST(request: NextRequest) {
     // 5. Create generation record (pending)
     const generationId = crypto.randomUUID();
     const storagePath = getGenerationPath(user.id, projectId, generationId);
-    const prompt = buildPrompt({ style, timeOfDay, season, weather, customPrompt, selectedPlants, selectedHardscape, sourceWidth, sourceHeight });
+    const prompt = buildPrompt({ style: style ?? null, timeOfDay, season, weather, customPrompt, selectedPlants, selectedHardscape, sourceWidth, sourceHeight, hasReferenceAttachments: (referenceImages?.length ?? 0) > 0 });
 
     // Build library items metadata for persistence
     const allItems = [...(selectedPlants ?? []), ...(selectedHardscape ?? [])];
     const libraryItemsMeta = allItems.length > 0
-      ? allItems.map((item: { common_name: string; image_path?: string }) => ({
+      ? allItems.map((item) => ({
           id: item.common_name,
           name: item.common_name,
           thumbnail_url: item.image_path
@@ -194,6 +207,12 @@ export async function POST(request: NextRequest) {
       ];
       for (const ref of refImages) {
         parts.push({ inlineData: { mimeType: ref.mimeType, data: ref.data } });
+      }
+      // User-attached reference images
+      if (referenceImages?.length) {
+        for (const ref of referenceImages) {
+          parts.push({ inlineData: { mimeType: ref.mimeType, data: ref.base64 } });
+        }
       }
       parts.push({ text: prompt });
 

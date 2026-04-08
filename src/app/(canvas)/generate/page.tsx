@@ -7,7 +7,9 @@ import {
   attachSignedUrls,
   BUCKET_UPLOADS,
   BUCKET_GENERATIONS,
+  BUCKET_VIDEOS,
 } from "@/lib/utils/storage";
+import type { VideoGeneration } from "@/types";
 
 export const metadata = { title: "Generate" };
 
@@ -66,10 +68,25 @@ export default async function CanvasGeneratePage({
         .limit(200)
     : { data: [] as never[] };
 
-  // Batch signed URLs for uploads and generations
-  const [imagesWithUrls, generationsWithUrls] = await Promise.all([
+  // Fetch video generations for this project
+  const { data: videoGenerations } = await supabase
+    .from("video_generations")
+    .select("*")
+    .eq("project_id", projectId)
+    .eq("status", "completed")
+    .order("created_at", { ascending: true })
+    .limit(100);
+
+  // Video rows use storage_path (nullable) — only sign those with a path set.
+  const videosWithPath = ((videoGenerations ?? []) as VideoGeneration[]).filter(
+    (v): v is VideoGeneration & { storage_path: string } => !!v.storage_path
+  );
+
+  // Batch signed URLs for uploads, generations, and videos in parallel
+  const [imagesWithUrls, generationsWithUrls, videosWithUrls] = await Promise.all([
     attachSignedUrls(admin, BUCKET_UPLOADS, images ?? []),
     attachSignedUrls(admin, BUCKET_GENERATIONS, generations ?? []),
+    attachSignedUrls(admin, BUCKET_VIDEOS, videosWithPath),
   ]);
 
   return (
@@ -77,6 +94,7 @@ export default async function CanvasGeneratePage({
       project={project}
       images={imagesWithUrls}
       generations={generationsWithUrls}
+      videoGenerations={videosWithUrls}
       creditsBalance={profile?.credits_balance ?? 0}
       userProfile={{
         full_name: profile?.full_name ?? null,

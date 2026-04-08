@@ -9,6 +9,12 @@ import {
 } from "@/lib/gemini/prompts";
 import type { LibraryItem } from "@/types";
 
+export interface AttachmentPreview {
+  id: string;
+  name: string;
+  previewUrl: string;
+}
+
 interface CanvasBottomBarProps {
   style: string | null;
   onStyleChange: (style: string | null) => void;
@@ -22,6 +28,9 @@ interface CanvasBottomBarProps {
   onCustomPromptChange: (v: string) => void;
   onGenerate: () => void;
   onOpenLibrary: () => void;
+  // Video generation
+  onOpenVideoModal: () => void;
+  videoButtonState: "disabled-no-selection" | "disabled-aspect-mismatch" | "enabled";
   generating: boolean;
   credits: number;
   hasSelection: boolean;
@@ -31,7 +40,16 @@ interface CanvasBottomBarProps {
   onRemoveLibraryItem: (id: string) => void;
   onLibraryItemClick: (id: string) => void;
   promptCollapsed: boolean;
+  // Attachments
+  attachments: AttachmentPreview[];
+  onAddAttachmentFiles: (files: FileList) => void;
+  onPasteAttachment: (blob: Blob, name: string) => void;
+  onRemoveAttachment: (id: string) => void;
 }
+
+// Accepted file types for reference attachments
+const ACCEPTED_ATTACHMENT_TYPES = "image/jpeg,image/png,image/webp";
+const MAX_ATTACHMENTS = 5;
 
 // Cycle through options array: current → next → (none) → first → ...
 function cycleOption(current: string, options: readonly string[]): string {
@@ -77,6 +95,8 @@ export function CanvasBottomBar({
   onCustomPromptChange,
   onGenerate,
   onOpenLibrary,
+  onOpenVideoModal,
+  videoButtonState,
   generating,
   credits,
   hasSelection,
@@ -86,11 +106,16 @@ export function CanvasBottomBar({
   onRemoveLibraryItem,
   onLibraryItemClick,
   promptCollapsed,
+  attachments,
+  onAddAttachmentFiles,
+  onPasteAttachment,
+  onRemoveAttachment,
 }: CanvasBottomBarProps) {
   const [styleDropdownOpen, setStyleDropdownOpen] = useState(false);
   const [promptFocused, setPromptFocused] = useState(false);
   const styleDropdownRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const attachmentInputRef = useRef<HTMLInputElement>(null);
 
   // When promptCollapsed is set externally, blur the textarea
   const promptExpanded = promptFocused && !promptCollapsed;
@@ -106,6 +131,72 @@ export function CanvasBottomBar({
     },
     {} as Record<string, typeof STYLE_PRESETS>
   );
+
+  const canAddMore = attachments.length < MAX_ATTACHMENTS;
+
+  // Handle paste on textarea — intercept image data from clipboard
+  function handlePaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const clipboardData = e.clipboardData;
+    if (!clipboardData) return;
+
+    // Primary path: clipboardData.files (most reliable for Ctrl+V after navigator.clipboard.write)
+    const files = clipboardData.files;
+    if (files && files.length > 0) {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (file.type.startsWith("image/")) {
+          e.preventDefault();
+          if (canAddMore) {
+            const ext = file.type.split("/")[1] || "png";
+            onPasteAttachment(file, file.name || `pasted-image.${ext}`);
+          }
+          return;
+        }
+      }
+    }
+
+    // Fallback: clipboardData.items
+    const items = clipboardData.items;
+    if (items) {
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.kind === "file" && item.type.startsWith("image/")) {
+          e.preventDefault();
+          if (canAddMore) {
+            const blob = item.getAsFile();
+            if (blob) {
+              const ext = item.type.split("/")[1] || "png";
+              onPasteAttachment(blob, `pasted-image.${ext}`);
+            }
+          }
+          return;
+        }
+      }
+    }
+  }
+
+  function handleAttachmentClick() {
+    attachmentInputRef.current?.click();
+  }
+
+  function handleAttachmentInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      onAddAttachmentFiles(files);
+    }
+    if (attachmentInputRef.current) attachmentInputRef.current.value = "";
+  }
+
+  const hasExtras = selectedLibraryItems.length > 0 || attachments.length > 0;
+
+  // Shorten long filenames for display in tags
+  function shortenName(name: string, max = 18): string {
+    if (name.length <= max) return name;
+    const dot = name.lastIndexOf(".");
+    if (dot === -1 || dot < max - 6) return name.slice(0, max - 1) + "\u2026";
+    const ext = name.slice(dot);
+    return name.slice(0, max - ext.length - 1) + "\u2026" + ext;
+  }
 
   return (
     <div className="absolute inset-x-0 bottom-0 z-10 flex flex-col items-center gap-2 pb-6 pointer-events-none">
@@ -236,6 +327,9 @@ export function CanvasBottomBar({
             <span className="text-xs">{"\uD83C\uDF31"}</span>
             <span className="text-sm font-medium text-foreground">Library</span>
           </button>
+
+          {/* Video Button — enabled only when exactly 2 same-aspect-ratio images are selected */}
+          <VideoButton state={videoButtonState} onClick={onOpenVideoModal} />
         </div>
 
         {/* Prompt Panel */}
@@ -246,28 +340,87 @@ export function CanvasBottomBar({
             boxShadow: "var(--shadow-toolbar)",
           }}
         >
-          <textarea
-            ref={textareaRef}
-            value={customPrompt}
-            onChange={(e) => onCustomPromptChange(e.target.value)}
-            onFocus={() => setPromptFocused(true)}
-            onBlur={() => setPromptFocused(false)}
-            placeholder={hasMask ? "Describe what to change in the masked area..." : "Custom instructions"}
-            className="w-full resize-none rounded-[10px] border px-3.5 py-2 text-base text-foreground placeholder:text-[#74716d] focus:outline-none"
-            style={{
-              backgroundColor: "var(--color-canvas-input-bg)",
-              borderColor: "var(--color-canvas-input-border)",
-              height: promptExpanded ? 120 : 40,
-              transition: "height 0.2s ease",
-              overflow: promptExpanded ? "auto" : "hidden",
-              lineHeight: "21px",
-            }}
-            rows={1}
-          />
+          {/* Textarea row with attachment button */}
+          <div className="flex items-start gap-2">
+            {/* Attachment button */}
+            <button
+              onClick={handleAttachmentClick}
+              disabled={!canAddMore}
+              className="relative mt-[7px] flex-shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+              title={canAddMore ? "Attach reference images (Ctrl+V to paste)" : `Max ${MAX_ATTACHMENTS} attachments`}
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+              </svg>
+              {attachments.length > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
+                  {attachments.length}
+                </span>
+              )}
+            </button>
 
-          {/* Selected library items — inside prompt container */}
-          {selectedLibraryItems.length > 0 && (
+            {/* Hidden file input for attachments */}
+            <input
+              ref={attachmentInputRef}
+              type="file"
+              accept={ACCEPTED_ATTACHMENT_TYPES}
+              multiple
+              onChange={handleAttachmentInputChange}
+              className="hidden"
+            />
+
+            <textarea
+              ref={textareaRef}
+              value={customPrompt}
+              onChange={(e) => onCustomPromptChange(e.target.value)}
+              onFocus={() => setPromptFocused(true)}
+              onBlur={() => setPromptFocused(false)}
+              onPaste={handlePaste}
+              placeholder={hasMask ? "Describe what to change in the masked area..." : "Custom instructions (Ctrl+V to paste images)"}
+              className="w-full resize-none rounded-[10px] border px-3.5 py-2 text-base text-foreground placeholder:text-[#74716d] focus:outline-none"
+              style={{
+                backgroundColor: "var(--color-canvas-input-bg)",
+                borderColor: "var(--color-canvas-input-border)",
+                height: promptExpanded ? 120 : 40,
+                transition: "height 0.2s ease",
+                overflow: promptExpanded ? "auto" : "hidden",
+                lineHeight: "21px",
+              }}
+              rows={1}
+            />
+          </div>
+
+          {/* Tag row — attachments + library items (inline) */}
+          {hasExtras && (
             <div className="mt-2 flex flex-wrap gap-1.5">
+              {/* Reference attachment tags */}
+              {attachments.map((att) => (
+                <span
+                  key={att.id}
+                  className="inline-flex items-center gap-1 rounded-full bg-muted py-0.5 pl-0.5 pr-2 text-xs font-medium text-foreground"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={att.previewUrl}
+                    alt={att.name}
+                    className="h-5 w-5 rounded-full object-cover"
+                  />
+                  <span className="max-w-[140px] truncate" title={att.name}>
+                    {shortenName(att.name)}
+                  </span>
+                  <button
+                    onClick={() => onRemoveAttachment(att.id)}
+                    className="ml-0.5 rounded-full hover:bg-black/10"
+                    aria-label={`Remove ${att.name}`}
+                  >
+                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </span>
+              ))}
+
+              {/* Selected library item tags */}
               {selectedLibraryItems.map((item) => (
                 <span
                   key={item.id}
@@ -297,7 +450,7 @@ export function CanvasBottomBar({
           )}
         </div>
 
-        {/* Generate CTA */}
+        {/* Generate CTA — unchanged below */}
         <div
           className="flex items-center justify-center overflow-hidden rounded-[20px] px-[11px] py-3"
           style={{
@@ -329,6 +482,80 @@ export function CanvasBottomBar({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ----------------------------------------------------------------------------
+// Video button — disabled until exactly 2 same-aspect-ratio images are selected.
+// Shows a tooltip on hover describing why it is disabled.
+// ----------------------------------------------------------------------------
+function VideoButton({
+  state,
+  onClick,
+}: {
+  state: "disabled-no-selection" | "disabled-aspect-mismatch" | "enabled";
+  onClick: () => void;
+}) {
+  const [tooltipOpen, setTooltipOpen] = useState(false);
+  const disabled = state !== "enabled";
+
+  const tooltipText =
+    state === "disabled-no-selection"
+      ? "Select 2 images"
+      : state === "disabled-aspect-mismatch"
+        ? "Images must match aspect ratio"
+        : "";
+
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => disabled && setTooltipOpen(true)}
+      onMouseLeave={() => setTooltipOpen(false)}
+    >
+      <button
+        onClick={disabled ? undefined : onClick}
+        aria-disabled={disabled}
+        className={`flex h-10 items-center gap-1 whitespace-nowrap rounded-[10px] px-2.5 py-2 transition-opacity ${
+          disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+        }`}
+        style={{ backgroundColor: "var(--color-canvas-chip-bg)" }}
+      >
+        <svg
+          className="h-4 w-4"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+          style={{ color: "var(--color-foreground)" }}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+          />
+        </svg>
+        <span className="text-sm font-medium text-foreground">Video</span>
+      </button>
+
+      {tooltipOpen && tooltipText && (
+        <div
+          className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-medium text-white shadow-lg"
+          style={{ backgroundColor: "rgba(0, 0, 0, 0.85)" }}
+        >
+          {tooltipText}
+          <div
+            className="absolute left-1/2 top-full -translate-x-1/2"
+            style={{
+              width: 0,
+              height: 0,
+              borderLeft: "5px solid transparent",
+              borderRight: "5px solid transparent",
+              borderTop: "5px solid rgba(0, 0, 0, 0.85)",
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }

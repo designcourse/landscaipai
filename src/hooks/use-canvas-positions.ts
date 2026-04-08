@@ -20,8 +20,9 @@ const GENERATION_VERTICAL_GAP = 160; // Extra space for metadata (title + tags +
 
 export interface CanvasItemSeed {
   id: string;
-  type: "original" | "generation";
-  imageId: string; // parent image ID (for generations, their source)
+  // Videos share generation layout semantics — treat them as "generation" for auto-layout.
+  type: "original" | "generation" | "video";
+  imageId: string; // parent image ID (for generations/videos, their source)
   naturalWidth: number;
   naturalHeight: number;
 }
@@ -29,12 +30,12 @@ export interface CanvasItemSeed {
 function computeAutoLayout(items: CanvasItemSeed[]): Record<string, ItemPosition> {
   const positions: Record<string, ItemPosition> = {};
 
-  // Separate originals and generations
+  // Separate originals and generations (videos share generation layout semantics)
   const originals = items.filter((i) => i.type === "original");
   const generationsByImage: Record<string, CanvasItemSeed[]> = {};
 
   for (const item of items) {
-    if (item.type === "generation") {
+    if (item.type === "generation" || item.type === "video") {
       if (!generationsByImage[item.imageId]) generationsByImage[item.imageId] = [];
       generationsByImage[item.imageId].push(item);
     }
@@ -72,9 +73,11 @@ function computeAutoLayout(items: CanvasItemSeed[]): Record<string, ItemPosition
     currentX = (gens.length > 0 ? genX : currentX + width) + HORIZONTAL_GAP;
   }
 
-  // Handle orphan generations (whose parent image isn't in originals list)
+  // Handle orphan generations/videos (whose parent image isn't in originals list)
   const orphanGens = items.filter(
-    (i) => i.type === "generation" && !originals.some((o) => o.id === i.imageId)
+    (i) =>
+      (i.type === "generation" || i.type === "video") &&
+      !originals.some((o) => o.id === i.imageId)
   );
   for (const gen of orphanGens) {
     if (positions[gen.id]) continue;

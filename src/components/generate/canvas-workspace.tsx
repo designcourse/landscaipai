@@ -18,6 +18,12 @@ import { CanvasBottomBar } from "./canvas-bottom-bar";
 import { ZoomIndicator } from "./zoom-indicator";
 import { InpaintCanvas } from "./inpaint-canvas";
 import { PlantBrowser } from "./plant-browser";
+import { VideoGenerationModal, type VideoGenerationSubmit } from "./video-generation-modal";
+import {
+  VIDEO_MODELS,
+  CAMERA_PRESETS,
+  TRANSITION_PRESETS,
+} from "@/lib/gemini/video-prompts";
 import { useCanvasViewport } from "@/hooks/use-canvas-viewport";
 import {
   useCanvasPositions,
@@ -25,15 +31,17 @@ import {
   GENERATION_OFFSET_X,
   type CanvasItemSeed,
 } from "@/hooks/use-canvas-positions";
-import type { Image, Generation, LibraryItem } from "@/types";
+import type { Image, Generation, LibraryItem, VideoGeneration } from "@/types";
 
 type GenerationWithUrl = Generation & { url: string };
 type ImageWithUrl = Image & { url: string };
+type VideoGenerationWithUrl = VideoGeneration & { url: string };
 
 interface CanvasWorkspaceProps {
   project: { id: string; name: string; hardiness_zone: string | null };
   images: ImageWithUrl[];
   generations: GenerationWithUrl[];
+  videoGenerations?: VideoGenerationWithUrl[];
   creditsBalance: number;
   userProfile: { full_name: string | null; avatar_url: string | null; email: string };
   userId: string;
@@ -54,7 +62,8 @@ function buildDisplayPrompt(gen: GenerationWithUrl): string {
 
 function buildCanvasItems(
   images: ImageWithUrl[],
-  generations: GenerationWithUrl[]
+  generations: GenerationWithUrl[],
+  videos: VideoGenerationWithUrl[] = []
 ): CanvasItem[] {
   const items: CanvasItem[] = [];
 
@@ -100,6 +109,35 @@ function buildCanvasItems(
     });
   }
 
+  for (const vg of videos) {
+    // Resolve the "source image" this video chain belongs to (use start frame's image)
+    const startImageId =
+      vg.start_image_id ||
+      generations.find((g) => g.id === vg.start_generation_id)?.image_id ||
+      null;
+    const sourceImage = startImageId ? images.find((i) => i.id === startImageId) : undefined;
+    const natWidth = vg.width ?? sourceImage?.width ?? 1200;
+    const natHeight = vg.height ?? sourceImage?.height ?? 900;
+
+    const modelShort = vg.model.includes("fast") ? "VEO FAST" : "VEO";
+    const cameraLabel = vg.camera_preset
+      ? vg.camera_preset.replace(/_/g, " ").toUpperCase()
+      : "VIDEO";
+    const resLabel = vg.resolution === "1080p" ? "1080p" : "720p";
+
+    items.push({
+      id: vg.id,
+      type: "video",
+      imageId: startImageId ?? vg.id,
+      url: vg.url,
+      naturalWidth: natWidth,
+      naturalHeight: natHeight,
+      title: `${modelShort} · ${cameraLabel}`,
+      settingsSummary: `${resLabel} · ${vg.duration_seconds}s · ${vg.transition_preset ?? ""}`,
+      status: "ready",
+    });
+  }
+
   return items;
 }
 
@@ -107,6 +145,7 @@ export function CanvasWorkspace({
   project,
   images: initialImages,
   generations: initialGenerations,
+  videoGenerations: initialVideoGenerations = [],
   creditsBalance: initialCredits,
   userProfile,
   userId,
@@ -115,9 +154,16 @@ export function CanvasWorkspace({
 
   // Canvas items state
   const [canvasItems, setCanvasItems] = useState<CanvasItem[]>(() =>
-    buildCanvasItems(initialImages, initialGenerations)
+    buildCanvasItems(initialImages, initialGenerations, initialVideoGenerations)
   );
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
+  // Parallel ordered list to preserve selection order (first = start frame for video)
+  const [selectionOrder, setSelectionOrder] = useState<string[]>([]);
+
+  // Video generation state
+  const [videoModalOpen, setVideoModalOpen] = useState(false);
+  const [videoSubmitting, setVideoSubmitting] = useState(false);
+  const [videoError, setVideoError] = useState<string | null>(null);
 
   // Credits
   const [credits, setCredits] = useState(initialCredits);
@@ -304,6 +350,119 @@ export function CanvasWorkspace({
   // Prompt collapse state (collapses when clicking canvas background)
   const [promptCollapsed, setPromptCollapsed] = useState(false);
 
+  // Reference attachments (images pasted or attached by user as context for AI)
+  interface ReferenceAttachment {
+    id: string;
+    name: string;
+    previewUrl: string;
+    blob: Blob;
+  }
+  const [referenceAttachments, setReferenceAttachments] = useState<ReferenceAttachment[]>([]);
+  const MAX_ATTACHMENTS = 5;
+  const MAX_ATTACHMENT_SIZE = 25 * 1024 * 1024; // 25MB per source file (compressed before send)
+  const COMPRESS_MAX_DIM = 2048; // px — max dimension for compressed reference images
+  const COMPRESS_QUALITY = 0.85;
+
+  function formatBytes(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  // Compress/resize an image Blob to webp with a max dimension
+  async function compressImage(source: Blob): Promise<Blob> {
+    const url = URL.createObjectURL(source);
+    try {
+      const img = new window.Image();
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error("Failed to load image"));
+        img.src = url;
+      });
+      const { naturalWidth: nw, naturalHeight: nh } = img;
+      const scale = Math.min(1, COMPRESS_MAX_DIM / Math.max(nw, nh));
+      const w = Math.max(1, Math.round(nw * scale));
+      const h = Math.max(1, Math.round(nh * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Canvas 2d context unavailable");
+      ctx.drawImage(img, 0, 0, w, h);
+      const out = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob((b) => resolve(b), "image/webp", COMPRESS_QUALITY)
+      );
+      if (!out) throw new Error("Compression failed");
+      return out;
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  async function addCompressedAttachments(
+    sources: { blob: Blob; name: string }[]
+  ) {
+    const remaining = MAX_ATTACHMENTS - referenceAttachments.length;
+    if (remaining <= 0) {
+      setError(`Max ${MAX_ATTACHMENTS} attachments allowed.`);
+      return;
+    }
+    const slice = sources.slice(0, remaining);
+    const errors: string[] = [];
+    const added: ReferenceAttachment[] = [];
+
+    for (const src of slice) {
+      if (!src.blob.type.startsWith("image/")) {
+        errors.push(`${src.name}: not an image`);
+        continue;
+      }
+      if (src.blob.size > MAX_ATTACHMENT_SIZE) {
+        errors.push(`${src.name}: ${formatBytes(src.blob.size)} exceeds ${formatBytes(MAX_ATTACHMENT_SIZE)} limit`);
+        continue;
+      }
+      try {
+        const compressed = await compressImage(src.blob);
+        added.push({
+          id: crypto.randomUUID(),
+          name: src.name,
+          previewUrl: URL.createObjectURL(compressed),
+          blob: compressed,
+        });
+      } catch (err) {
+        errors.push(`${src.name}: ${err instanceof Error ? err.message : "compression failed"}`);
+      }
+    }
+
+    if (added.length > 0) {
+      setReferenceAttachments((prev) => [...prev, ...added]);
+    }
+    if (errors.length > 0) {
+      setError(errors.join(" · "));
+    } else if (added.length > 0) {
+      setError(null);
+    }
+  }
+
+  function handleAddAttachmentFiles(files: FileList) {
+    const sources: { blob: Blob; name: string }[] = [];
+    for (let i = 0; i < files.length; i++) {
+      sources.push({ blob: files[i], name: files[i].name });
+    }
+    void addCompressedAttachments(sources);
+  }
+
+  function handlePasteAttachment(blob: Blob, name: string) {
+    void addCompressedAttachments([{ blob, name }]);
+  }
+
+  function handleRemoveAttachment(id: string) {
+    setReferenceAttachments((prev) => {
+      const removed = prev.find((a) => a.id === id);
+      if (removed) URL.revokeObjectURL(removed.previewUrl);
+      return prev.filter((a) => a.id !== id);
+    });
+  }
+
   // Select an item. CTRL+click toggles in/out of selection.
   // If item is already selected (part of multi-select), just set it as primary for dragging.
   function handleSelectItem(id: string, e?: React.PointerEvent | React.MouseEvent) {
@@ -324,11 +483,17 @@ export function CanvasWorkspace({
         }
         return next;
       });
+      // Update ordered list
+      setSelectionOrder((prev) => {
+        if (prev.includes(id)) return prev.filter((x) => x !== id);
+        return [...prev, id];
+      });
     } else if (selectedItemIds.has(id) && selectedItemIds.size > 1) {
       // Item is already part of a multi-selection — just update primary for drag, don't deselect others
       setPrimarySelectedId(id);
     } else {
       setSelectedItemIds(new Set([id]));
+      setSelectionOrder([id]);
       setPrimarySelectedId(id);
     }
     // Un-collapse the prompt when selecting an item
@@ -339,6 +504,7 @@ export function CanvasWorkspace({
   function handleMarqueeSelect(ids: string[]) {
     const newSet = new Set(ids);
     setSelectedItemIds(newSet);
+    setSelectionOrder(ids);
     if (ids.length > 0) setPrimarySelectedId(ids[ids.length - 1]);
     else setPrimarySelectedId(null);
   }
@@ -413,6 +579,7 @@ export function CanvasWorkspace({
 
   function handleCanvasDeselect() {
     setSelectedItemIds(new Set());
+    setSelectionOrder([]);
     setPrimarySelectedId(null);
     setPromptCollapsed(true);
   }
@@ -453,6 +620,262 @@ export function CanvasWorkspace({
     setInpaintMode(false);
   }
 
+  // --- Video generation ---
+
+  // Resolve the two selected items in selection order (first = start, second = end).
+  // Returns null if we don't have exactly 2 valid non-video selections.
+  const videoFrames = useMemo(() => {
+    const ordered = selectionOrder
+      .filter((id) => selectedItemIds.has(id))
+      .map((id) => canvasItems.find((i) => i.id === id))
+      .filter((i): i is CanvasItem => !!i && i.type !== "video");
+    if (ordered.length !== 2) return null;
+    return { start: ordered[0], end: ordered[1] };
+  }, [selectionOrder, selectedItemIds, canvasItems]);
+
+  // Button state: needs 2 items, same aspect ratio (within 1% tolerance)
+  const videoButtonState: "disabled-no-selection" | "disabled-aspect-mismatch" | "enabled" =
+    useMemo(() => {
+      if (!videoFrames) return "disabled-no-selection";
+      const s = videoFrames.start;
+      const e = videoFrames.end;
+      if (!s.naturalWidth || !s.naturalHeight || !e.naturalWidth || !e.naturalHeight) {
+        return "disabled-aspect-mismatch";
+      }
+      const sr = s.naturalWidth / s.naturalHeight;
+      const er = e.naturalWidth / e.naturalHeight;
+      if (Math.abs(sr - er) > 0.01) return "disabled-aspect-mismatch";
+      return "enabled";
+    }, [videoFrames]);
+
+  function handleOpenVideoModal() {
+    if (videoButtonState !== "enabled") return;
+    setVideoError(null);
+    setVideoModalOpen(true);
+  }
+
+  function buildVideoTitle(modelId: string, cameraId: string): string {
+    const model = VIDEO_MODELS.find((m) => m.id === modelId);
+    const cam = CAMERA_PRESETS.find((c) => c.id === cameraId);
+    const modelShort = model?.name?.replace("Veo 3.1", "VEO").toUpperCase() ?? "VIDEO";
+    return `${modelShort} · ${cam?.name?.toUpperCase() ?? "VIDEO"}`;
+  }
+
+  function buildVideoSettingsSummary(
+    resolution: string,
+    durationS: number,
+    transitionId: string
+  ): string {
+    const tr = TRANSITION_PRESETS.find((t) => t.id === transitionId);
+    const resLabel = resolution === "1080p" ? "1080p" : "720p";
+    return `${resLabel} · ${durationS}s · ${tr?.name ?? ""}`;
+  }
+
+  async function handleVideoSubmit(values: VideoGenerationSubmit) {
+    if (!videoFrames) return;
+    // Apply the modal's swap toggle: if the user flipped them, the original
+    // first-selected becomes the end frame and vice versa.
+    const startItem = values.swapped ? videoFrames.end : videoFrames.start;
+    const endItem = values.swapped ? videoFrames.start : videoFrames.end;
+
+    // Close the modal immediately so the user can watch the placeholder appear
+    // and the generation animation run on the canvas. Errors after this point
+    // surface via the canvas-level error bar, not the modal.
+    setVideoModalOpen(false);
+    setVideoError(null);
+    setVideoSubmitting(true);
+
+    // Build frame source refs for the API
+    const startFrame =
+      startItem.type === "generation"
+        ? { kind: "generation" as const, id: startItem.id }
+        : { kind: "image" as const, id: startItem.imageId };
+    const endFrame =
+      endItem.type === "generation"
+        ? { kind: "generation" as const, id: endItem.id }
+        : { kind: "image" as const, id: endItem.imageId };
+
+    // Create placeholder card on canvas — positioned below/right of the end frame
+    const endPos = positions[endItem.id];
+    const placeholderId = crypto.randomUUID();
+    const placeholderWidth = endPos?.width ?? DEFAULT_WIDTH;
+    const placeholderHeight = endPos?.height ?? DEFAULT_WIDTH * 0.75;
+
+    // Place below the end frame so it doesn't collide with existing generations to the right
+    let placeholderX = endPos?.x ?? 0;
+    let placeholderY = (endPos?.y ?? 0) + placeholderHeight + 220;
+
+    // Shift right if there's an overlap
+    const metadataHeight = 200;
+    const maxAttempts = 50;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      let hasOverlap = false;
+      for (const [posId, pos] of Object.entries(positions)) {
+        const posBottom = pos.y + pos.height + metadataHeight;
+        const newBottom = placeholderY + placeholderHeight + metadataHeight;
+        if (
+          placeholderX < pos.x + pos.width &&
+          placeholderX + placeholderWidth > pos.x &&
+          placeholderY < posBottom &&
+          newBottom > pos.y &&
+          posId !== startItem.id &&
+          posId !== endItem.id
+        ) {
+          placeholderX = pos.x + pos.width + GENERATION_OFFSET_X;
+          hasOverlap = true;
+          break;
+        }
+      }
+      if (!hasOverlap) break;
+    }
+
+    const placeholderTitle = buildVideoTitle(values.modelId, values.cameraPresetId);
+    const placeholderSettings = buildVideoSettingsSummary(
+      values.resolution,
+      8,
+      values.transitionPresetId
+    );
+
+    const placeholder: CanvasItem = {
+      id: placeholderId,
+      type: "video",
+      imageId: startItem.imageId,
+      url: "",
+      sourceUrl: startItem.url, // show start frame as poster during generation
+      naturalWidth: startItem.naturalWidth,
+      naturalHeight: startItem.naturalHeight,
+      status: "generating",
+      title: placeholderTitle,
+      settingsSummary: placeholderSettings,
+    };
+
+    setCanvasItems((prev) => [...prev, placeholder]);
+    addItemPosition(placeholderId, {
+      x: placeholderX,
+      y: placeholderY,
+      width: placeholderWidth,
+      height: placeholderHeight,
+    });
+
+    // Center viewport on placeholder
+    const container = canvasContainerRef.current;
+    if (container) {
+      const rect = container.getBoundingClientRect();
+      setViewport({
+        ...viewport,
+        panX: -placeholderX + rect.width / 2 / viewport.zoom - placeholderWidth / 2,
+        panY: -placeholderY + rect.height / 2 / viewport.zoom - placeholderHeight / 2,
+      });
+    }
+
+    try {
+      const res = await fetch("/api/generate/video", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId: project.id,
+          startFrame,
+          endFrame,
+          modelId: values.modelId,
+          cameraPresetId: values.cameraPresetId,
+          transitionPresetId: values.transitionPresetId,
+          resolution: values.resolution,
+          customPrompt: values.customPrompt || undefined,
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        // Remove placeholder
+        setCanvasItems((prev) => prev.filter((i) => i.id !== placeholderId));
+        removeItemPositions([placeholderId]);
+        if (data.code === "NO_CREDITS") {
+          setError("Insufficient credits for this video.");
+        } else {
+          setError(data.error || "Failed to start video generation.");
+        }
+        setVideoSubmitting(false);
+        return;
+      }
+
+      // Success — swap placeholder ID to real DB ID so polling lines up
+      const realId = data.videoGeneration.id as string;
+      setCanvasItems((prev) =>
+        prev.map((i) => (i.id === placeholderId ? { ...i, id: realId } : i))
+      );
+      replaceItemId(placeholderId, realId);
+      setCredits(data.credits_remaining);
+      setVideoSubmitting(false);
+
+      // Kick off polling — it runs independently of the modal being open
+      pollVideoGeneration(realId);
+    } catch (err) {
+      console.error("Video generation request failed:", err);
+      setCanvasItems((prev) => prev.filter((i) => i.id !== placeholderId));
+      removeItemPositions([placeholderId]);
+      setError("Network error. Please try again.");
+      setVideoSubmitting(false);
+    }
+  }
+
+  // Poll the video generation until it completes or fails.
+  // Runs for up to ~10 minutes (60 attempts * 10s).
+  async function pollVideoGeneration(videoGenerationId: string) {
+    const MAX_ATTEMPTS = 60;
+    const INTERVAL_MS = 10000;
+
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, INTERVAL_MS));
+
+      try {
+        const res = await fetch(`/api/generate/video/${videoGenerationId}`);
+        const data = await res.json();
+
+        if (!res.ok) {
+          // Mark the canvas item as failed
+          setCanvasItems((prev) =>
+            prev.map((i) =>
+              i.id === videoGenerationId ? { ...i, status: "ready" as const } : i
+            )
+          );
+          setError(data.error || "Video generation failed");
+          return;
+        }
+
+        const vg = data.videoGeneration;
+        if (vg.status === "completed" && vg.url) {
+          // Swap placeholder to the real video
+          setCanvasItems((prev) =>
+            prev.map((i) =>
+              i.id === videoGenerationId
+                ? {
+                    ...i,
+                    url: vg.url,
+                    status: "ready" as const,
+                  }
+                : i
+            )
+          );
+          // Refresh credits (no-op if unchanged)
+          return;
+        }
+        if (vg.status === "failed") {
+          setCanvasItems((prev) => prev.filter((i) => i.id !== videoGenerationId));
+          removeItemPositions([videoGenerationId]);
+          setError(vg.error_message || "Video generation failed");
+          return;
+        }
+        // Still processing — continue the loop
+      } catch (err) {
+        console.error("Video poll error:", err);
+        // Transient network error — keep polling
+      }
+    }
+
+    // Timeout — leave the placeholder, tell the user
+    setError("Video generation is taking longer than expected. Refresh to check status.");
+  }
+
   // --- Deletion ---
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -462,6 +885,7 @@ export function CanvasWorkspace({
     // If the item isn't already selected, select it so the modal reflects it
     if (!selectedItemIds.has(id)) {
       setSelectedItemIds(new Set([id]));
+      setSelectionOrder([id]);
       setPrimarySelectedId(id);
     }
     setDeleteConfirmOpen(true);
@@ -505,7 +929,9 @@ export function CanvasWorkspace({
         const endpoint =
           item.type === "original"
             ? `/api/images/${item.imageId}`
-            : `/api/generations/${item.id}`;
+            : item.type === "video"
+              ? `/api/generate/video/${item.id}`
+              : `/api/generations/${item.id}`;
         return fetch(endpoint, { method: "DELETE" });
       });
 
@@ -521,6 +947,7 @@ export function CanvasWorkspace({
       setCanvasItems((prev) => prev.filter((i) => !allIdsToRemove.includes(i.id)));
       removeItemPositions(allIdsToRemove);
       setSelectedItemIds(new Set());
+      setSelectionOrder([]);
       setPrimarySelectedId(null);
     } catch (err) {
       console.error("Delete failed:", err);
@@ -644,6 +1071,25 @@ export function CanvasWorkspace({
         .filter((i) => i.item_type === "hardscape")
         .map((i) => ({ common_name: i.common_name, image_path: i.image_path }));
 
+      // Convert reference attachments to base64 for the API
+      let referenceImagesPayload: { base64: string; mimeType: string }[] | undefined;
+      if (referenceAttachments.length > 0) {
+        referenceImagesPayload = await Promise.all(
+          referenceAttachments.map(async (att) => {
+            const arrayBuffer = await att.blob.arrayBuffer();
+            const bytes = new Uint8Array(arrayBuffer);
+            let binary = "";
+            for (let i = 0; i < bytes.length; i++) {
+              binary += String.fromCharCode(bytes[i]);
+            }
+            return {
+              base64: btoa(binary),
+              mimeType: att.blob.type || "image/png",
+            };
+          })
+        );
+      }
+
       const payload: Record<string, unknown> = {
         imageId: sourceImageId,
         projectId: project.id,
@@ -655,6 +1101,7 @@ export function CanvasWorkspace({
         parentGenerationId: parentGenerationId || undefined,
         selectedPlants: selectedPlants.length > 0 ? selectedPlants : undefined,
         selectedHardscape: selectedHardscape.length > 0 ? selectedHardscape : undefined,
+        referenceImages: referenceImagesPayload,
       };
 
       if (maskBase64) {
@@ -972,6 +1419,8 @@ export function CanvasWorkspace({
           onCustomPromptChange={setCustomPrompt}
           onGenerate={handleGenerate}
           onOpenLibrary={() => setBrowserOpen(true)}
+          onOpenVideoModal={handleOpenVideoModal}
+          videoButtonState={videoButtonState}
           generating={generating}
           credits={credits}
           hasSelection={selectedItemIds.size > 0}
@@ -986,6 +1435,14 @@ export function CanvasWorkspace({
             setBrowserOpen(true);
           }}
           promptCollapsed={promptCollapsed}
+          attachments={referenceAttachments.map((a) => ({
+            id: a.id,
+            name: a.name,
+            previewUrl: a.previewUrl,
+          }))}
+          onAddAttachmentFiles={handleAddAttachmentFiles}
+          onPasteAttachment={handlePasteAttachment}
+          onRemoveAttachment={handleRemoveAttachment}
         />
       </div>
 
@@ -995,6 +1452,32 @@ export function CanvasWorkspace({
           imageUrl={inpaintImageUrl}
           onConfirm={handleMaskConfirm}
           onCancel={handleMaskCancel}
+        />
+      )}
+
+      {/* Video generation modal */}
+      {videoModalOpen && videoFrames && (
+        <VideoGenerationModal
+          startFrame={{
+            url: videoFrames.start.url,
+            width: videoFrames.start.naturalWidth,
+            height: videoFrames.start.naturalHeight,
+          }}
+          endFrame={{
+            url: videoFrames.end.url,
+            width: videoFrames.end.naturalWidth,
+            height: videoFrames.end.naturalHeight,
+          }}
+          credits={credits}
+          submitting={videoSubmitting}
+          error={videoError}
+          onClose={() => {
+            if (!videoSubmitting) {
+              setVideoModalOpen(false);
+              setVideoError(null);
+            }
+          }}
+          onSubmit={handleVideoSubmit}
         />
       )}
 

@@ -118,6 +118,34 @@ export interface CreditTransaction {
   created_at: string;
 }
 
+export type VideoGenerationStatus = "pending" | "processing" | "completed" | "failed";
+
+export interface VideoGeneration {
+  id: string;
+  user_id: string;
+  project_id: string;
+  start_image_id: string | null;
+  start_generation_id: string | null;
+  end_image_id: string | null;
+  end_generation_id: string | null;
+  model: string;
+  duration_seconds: number;
+  resolution: "720p" | "1080p";
+  aspect_ratio: string | null;
+  camera_preset: string | null;
+  transition_preset: string | null;
+  motion_prompt: string;
+  generate_audio: boolean;
+  width: number | null;
+  height: number | null;
+  storage_path: string | null;
+  status: VideoGenerationStatus;
+  error_message: string | null;
+  cost_credits: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export type SubscriptionPlan = "starter" | "pro" | "business";
 export type SubscriptionStatus = "active" | "past_due" | "canceled" | "incomplete";
 
