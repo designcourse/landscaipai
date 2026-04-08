@@ -8,7 +8,7 @@ type GenerationWithUrl = Generation & { url: string };
 
 export interface CanvasItem {
   id: string;
-  type: "original" | "generation" | "video";
+  type: "original" | "generation" | "video" | "finalized_video";
   imageId: string;
   url: string;
   naturalWidth: number;
@@ -26,6 +26,8 @@ export interface CanvasItem {
   videoModel?: string;         // for display ("Veo 3.1 Fast")
   cameraPreset?: string;       // for display
   transitionPreset?: string;   // for display
+  // Finalized-video-specific: id of the source video_generations row
+  sourceVideoGenerationId?: string;
 }
 
 interface CanvasImageCardProps {
@@ -39,6 +41,8 @@ interface CanvasImageCardProps {
   onEditRegion: (id: string) => void;
   onRequestDelete: (id: string) => void;
   onLibraryTagClick?: (tagId: string) => void;
+  /** Triggered when user clicks "Finalize Video" on a video card. */
+  onRequestFinalize?: (videoGenerationId: string) => void;
 }
 
 const RESIZE_HANDLE_SIZE = 10;
@@ -55,6 +59,7 @@ export const CanvasImageCard = memo(function CanvasImageCard({
   onEditRegion,
   onRequestDelete,
   onLibraryTagClick,
+  onRequestFinalize,
 }: CanvasImageCardProps) {
   const [hovered, setHovered] = useState(false);
   const [revealed, setRevealed] = useState(false);
@@ -133,7 +138,10 @@ export const CanvasImageCard = memo(function CanvasImageCard({
 
   const isGenerating = item.status === "generating";
   const isRevealing = item.status === "revealing";
-  const isVideo = item.type === "video";
+  // Both raw veo videos and finalized renders use the same <video> rendering
+  // path, hover affordances, and download flow.
+  const isVideo = item.type === "video" || item.type === "finalized_video";
+  const isFinalized = item.type === "finalized_video";
 
   // Progressive disclosure: fade out metadata below images at low zoom to prevent overlap.
   // Cards are only 30px apart, so counter-scaling text causes immediate overlap.
@@ -163,14 +171,20 @@ export const CanvasImageCard = memo(function CanvasImageCard({
       : item.type === "original"
         ? "jpg"
         : "webp";
-    const prefix = isVideo ? "video" : item.type === "original" ? "original" : "generation";
+    const prefix = isFinalized
+      ? "finalized"
+      : isVideo
+        ? "video"
+        : item.type === "original"
+          ? "original"
+          : "generation";
     a.download = `${prefix}-${item.id.slice(0, 8)}.${ext}`;
     a.target = "_blank";
     a.rel = "noopener";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-  }, [item.id, item.url, item.type, isVideo]);
+  }, [item.id, item.url, item.type, isVideo, isFinalized]);
 
   return (
     <div
@@ -186,8 +200,11 @@ export const CanvasImageCard = memo(function CanvasImageCard({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => { setHovered(false); setMenuOpen(false); }}
     >
-      {/* Title (generations + videos) */}
-      {(item.type === "generation" || item.type === "video") && item.title && (
+      {/* Title (generations + videos + finalized videos) */}
+      {(item.type === "generation" ||
+        item.type === "video" ||
+        item.type === "finalized_video") &&
+        item.title && (
         <p
           className="mb-3 text-xs font-bold uppercase tracking-wider"
           style={{
@@ -290,6 +307,33 @@ export const CanvasImageCard = memo(function CanvasImageCard({
         {/* Selection outline */}
         {selected && (
           <div className="pointer-events-none absolute inset-0 rounded-md border-2 border-blue-500" />
+        )}
+
+        {/* Finalized badge — small glass pill in the top-left of the video */}
+        {isFinalized && (
+          <div
+            className="pointer-events-none absolute left-3 top-3 flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold text-white"
+            style={{
+              backgroundColor: "rgba(15, 15, 18, 0.6)",
+              backdropFilter: "blur(12px) saturate(140%)",
+              WebkitBackdropFilter: "blur(12px) saturate(140%)",
+              border: "1px solid rgba(255, 255, 255, 0.15)",
+              boxShadow: "0 4px 12px rgba(0, 0, 0, 0.3)",
+              transform: editScale > 1 ? `scale(${editScale})` : undefined,
+              transformOrigin: "top left",
+            }}
+          >
+            <svg
+              className="h-3 w-3"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2.5}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+            Finalized
+          </div>
         )}
 
         {/* Video hover action: circular white download button only */}
@@ -400,6 +444,22 @@ export const CanvasImageCard = memo(function CanvasImageCard({
               </svg>
               Download
             </button>
+            {item.type === "video" && onRequestFinalize && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMenuOpen(false);
+                  onRequestFinalize(item.id);
+                }}
+                className="flex w-full items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors hover:bg-gray-100"
+                style={{ color: "var(--color-foreground)" }}
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                Finalize Video
+              </button>
+            )}
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -422,7 +482,9 @@ export const CanvasImageCard = memo(function CanvasImageCard({
       {selected && !isGenerating && (() => {
         // Title adds ~28px above the image for generations + videos (text-xs + mb-3)
         const titleOffset =
-          (item.type === "generation" || item.type === "video") && item.title ? 28 : 0;
+          (item.type === "generation" ||
+            item.type === "video" ||
+            item.type === "finalized_video") && item.title ? 28 : 0;
         const imgTop = titleOffset - RESIZE_HANDLE_SIZE / 2;
         const imgBottom = titleOffset + position.height - RESIZE_HANDLE_SIZE / 2;
         return (
@@ -493,9 +555,11 @@ export const CanvasImageCard = memo(function CanvasImageCard({
         </div>
       )}
 
-      {/* Prompt + settings (generations + videos) — fade out when zoomed out */}
+      {/* Prompt + settings (generations + videos + finalized) — fade out when zoomed out */}
       {detailOpacity > 0 &&
-        (item.type === "generation" || item.type === "video") &&
+        (item.type === "generation" ||
+          item.type === "video" ||
+          item.type === "finalized_video") &&
         (item.userPrompt || item.settingsSummary) && (
         <div className="mt-7" style={{ opacity: detailOpacity }}>
           {item.userPrompt && (

@@ -19,6 +19,7 @@ import { ZoomIndicator } from "./zoom-indicator";
 import { InpaintCanvas } from "./inpaint-canvas";
 import { PlantBrowser } from "./plant-browser";
 import { VideoGenerationModal, type VideoGenerationSubmit } from "./video-generation-modal";
+import { FinalizeVideoModal } from "./finalize-video-modal";
 import {
   VIDEO_MODELS,
   CAMERA_PRESETS,
@@ -31,17 +32,25 @@ import {
   GENERATION_OFFSET_X,
   type CanvasItemSeed,
 } from "@/hooks/use-canvas-positions";
-import type { Image, Generation, LibraryItem, VideoGeneration } from "@/types";
+import type {
+  Image,
+  Generation,
+  LibraryItem,
+  VideoFinalization,
+  VideoGeneration,
+} from "@/types";
 
 type GenerationWithUrl = Generation & { url: string };
 type ImageWithUrl = Image & { url: string };
 type VideoGenerationWithUrl = VideoGeneration & { url: string };
+type VideoFinalizationWithUrl = VideoFinalization & { url: string };
 
 interface CanvasWorkspaceProps {
   project: { id: string; name: string; hardiness_zone: string | null };
   images: ImageWithUrl[];
   generations: GenerationWithUrl[];
   videoGenerations?: VideoGenerationWithUrl[];
+  videoFinalizations?: VideoFinalizationWithUrl[];
   creditsBalance: number;
   userProfile: { full_name: string | null; avatar_url: string | null; email: string };
   userId: string;
@@ -63,7 +72,8 @@ function buildDisplayPrompt(gen: GenerationWithUrl): string {
 function buildCanvasItems(
   images: ImageWithUrl[],
   generations: GenerationWithUrl[],
-  videos: VideoGenerationWithUrl[] = []
+  videos: VideoGenerationWithUrl[] = [],
+  finalizations: VideoFinalizationWithUrl[] = []
 ): CanvasItem[] {
   const items: CanvasItem[] = [];
 
@@ -138,6 +148,36 @@ function buildCanvasItems(
     });
   }
 
+  // Finalized videos — siblings of their source veo video, with a "Finalized" badge.
+  // Inherit dimensions from the source veo so the card aspect ratio matches.
+  for (const fin of finalizations) {
+    const sourceVideo = videos.find((v) => v.id === fin.video_generation_id);
+    if (!sourceVideo) continue; // shouldn't happen — DB FK guarantees this
+
+    const startImageId =
+      sourceVideo.start_image_id ||
+      generations.find((g) => g.id === sourceVideo.start_generation_id)?.image_id ||
+      null;
+
+    const natWidth =
+      sourceVideo.actual_width ?? sourceVideo.width ?? 1280;
+    const natHeight =
+      sourceVideo.actual_height ?? sourceVideo.height ?? 720;
+
+    items.push({
+      id: fin.id,
+      type: "finalized_video",
+      imageId: startImageId ?? sourceVideo.id,
+      url: fin.url,
+      naturalWidth: natWidth,
+      naturalHeight: natHeight,
+      title: "FINALIZED",
+      settingsSummary: "Branded · Ready to share",
+      status: "ready",
+      sourceVideoGenerationId: sourceVideo.id,
+    });
+  }
+
   return items;
 }
 
@@ -146,6 +186,7 @@ export function CanvasWorkspace({
   images: initialImages,
   generations: initialGenerations,
   videoGenerations: initialVideoGenerations = [],
+  videoFinalizations: initialVideoFinalizations = [],
   creditsBalance: initialCredits,
   userProfile,
   userId,
@@ -154,7 +195,12 @@ export function CanvasWorkspace({
 
   // Canvas items state
   const [canvasItems, setCanvasItems] = useState<CanvasItem[]>(() =>
-    buildCanvasItems(initialImages, initialGenerations, initialVideoGenerations)
+    buildCanvasItems(
+      initialImages,
+      initialGenerations,
+      initialVideoGenerations,
+      initialVideoFinalizations
+    )
   );
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
   // Parallel ordered list to preserve selection order (first = start frame for video)
@@ -164,6 +210,10 @@ export function CanvasWorkspace({
   const [videoModalOpen, setVideoModalOpen] = useState(false);
   const [videoSubmitting, setVideoSubmitting] = useState(false);
   const [videoError, setVideoError] = useState<string | null>(null);
+
+  // Finalize Video modal — holds the videoGenerationId being finalized.
+  // null means the modal is closed.
+  const [finalizeVideoId, setFinalizeVideoId] = useState<string | null>(null);
 
   // Credits
   const [credits, setCredits] = useState(initialCredits);
@@ -1392,6 +1442,9 @@ export function CanvasWorkspace({
                   setBrowserFocusId(tagId);
                   setBrowserOpen(true);
                 }}
+                onRequestFinalize={(videoGenerationId) =>
+                  setFinalizeVideoId(videoGenerationId)
+                }
               />
             );
           })}
@@ -1478,6 +1531,22 @@ export function CanvasWorkspace({
             }
           }}
           onSubmit={handleVideoSubmit}
+        />
+      )}
+
+      {/* Finalize video modal */}
+      {finalizeVideoId && (
+        <FinalizeVideoModal
+          videoGenerationId={finalizeVideoId}
+          hardinessZone={project.hardiness_zone}
+          onClose={() => setFinalizeVideoId(null)}
+          onCompleted={() => {
+            // Refresh the canvas so the new finalized video card appears.
+            // Task 10 will wire the actual finalized_video item type into
+            // the project query — for now, a server-component refresh is
+            // enough to pick it up once that's done.
+            router.refresh();
+          }}
         />
       )}
 

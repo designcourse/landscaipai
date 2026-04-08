@@ -8,8 +8,9 @@ import {
   BUCKET_UPLOADS,
   BUCKET_GENERATIONS,
   BUCKET_VIDEOS,
+  BUCKET_FINALIZED_VIDEOS,
 } from "@/lib/utils/storage";
-import type { VideoGeneration } from "@/types";
+import type { VideoFinalization, VideoGeneration } from "@/types";
 
 export const metadata = { title: "Generate" };
 
@@ -82,11 +83,47 @@ export default async function CanvasGeneratePage({
     (v): v is VideoGeneration & { storage_path: string } => !!v.storage_path
   );
 
-  // Batch signed URLs for uploads, generations, and videos in parallel
-  const [imagesWithUrls, generationsWithUrls, videosWithUrls] = await Promise.all([
+  // Fetch finalized videos for this project (joined through video_generations)
+  const videoGenIds = (videoGenerations ?? []).map((vg) => vg.id);
+  const { data: finalizations } =
+    videoGenIds.length > 0
+      ? await supabase
+          .from("video_finalizations")
+          .select("*")
+          .in("video_generation_id", videoGenIds)
+          .eq("status", "completed")
+          .not("output_storage_path", "is", null)
+          .order("created_at", { ascending: true })
+          .limit(100)
+      : { data: [] as VideoFinalization[] };
+
+  const finalizationsWithPath = (
+    (finalizations ?? []) as VideoFinalization[]
+  ).filter(
+    (f): f is VideoFinalization & { output_storage_path: string } =>
+      !!f.output_storage_path
+  );
+
+  // Batch signed URLs for uploads, generations, videos, and finalizations
+  const [
+    imagesWithUrls,
+    generationsWithUrls,
+    videosWithUrls,
+    finalizationsWithUrls,
+  ] = await Promise.all([
     attachSignedUrls(admin, BUCKET_UPLOADS, images ?? []),
     attachSignedUrls(admin, BUCKET_GENERATIONS, generations ?? []),
     attachSignedUrls(admin, BUCKET_VIDEOS, videosWithPath),
+    attachSignedUrls(
+      admin,
+      BUCKET_FINALIZED_VIDEOS,
+      // attachSignedUrls signs the `storage_path` field — finalizations
+      // store theirs in `output_storage_path`, so map for the helper.
+      finalizationsWithPath.map((f) => ({
+        ...f,
+        storage_path: f.output_storage_path,
+      }))
+    ),
   ]);
 
   return (
@@ -95,6 +132,7 @@ export default async function CanvasGeneratePage({
       images={imagesWithUrls}
       generations={generationsWithUrls}
       videoGenerations={videosWithUrls}
+      videoFinalizations={finalizationsWithUrls}
       creditsBalance={profile?.credits_balance ?? 0}
       userProfile={{
         full_name: profile?.full_name ?? null,
