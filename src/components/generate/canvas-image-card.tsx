@@ -336,10 +336,10 @@ export const CanvasImageCard = memo(function CanvasImageCard({
           </div>
         )}
 
-        {/* Video hover action: circular white download button only */}
+        {/* Video hover actions: download + 3-dot menu (matches image-card pattern) */}
         {showVideoDownload && (
           <div
-            className="absolute right-4 top-4"
+            className="absolute right-4 top-4 flex items-center gap-2"
             style={{
               transform: editScale > 1 ? `scale(${editScale})` : undefined,
               transformOrigin: "top right",
@@ -366,6 +366,21 @@ export const CanvasImageCard = memo(function CanvasImageCard({
                   strokeLinejoin="round"
                   d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
                 />
+              </svg>
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setMenuOpen((prev) => !prev);
+              }}
+              className="flex h-[38px] w-[38px] items-center justify-center rounded-full bg-white shadow-lg transition-shadow hover:shadow-xl"
+              title="More actions"
+              aria-label="More actions"
+            >
+              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="#1a1a1a">
+                <circle cx="12" cy="5" r="2" />
+                <circle cx="12" cy="12" r="2" />
+                <circle cx="12" cy="19" r="2" />
               </svg>
             </button>
           </div>
@@ -416,7 +431,7 @@ export const CanvasImageCard = memo(function CanvasImageCard({
           className="absolute z-50"
           style={{
             right: 16,
-            top: (item.type === "generation" && item.title ? 28 : 0) + 16,
+            top: ((item.type === "generation" || item.type === "video") && item.title ? 28 : 0) + 16,
             transform: editScale > 1 ? `scale(${editScale})` : undefined,
             transformOrigin: "top right",
           }}
