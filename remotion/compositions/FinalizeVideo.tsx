@@ -77,14 +77,21 @@ export const calculateFinalizeVideoMetadata: CalculateMetadataFunction<FinalizeV
  *
  * Layering, bottom to top:
  *   1. Live <OffthreadVideo>     — opacity drops to 0 at the freeze boundary
- *   2. Frozen <OffthreadVideo>   — always mounted (so it has time to seek
- *                                  to the last frame), opacity rises to 1
- *                                  at the freeze boundary
+ *   2. Frozen <OffthreadVideo>   — mounts FREEZE_PRELOAD_FRAMES before the
+ *                                  boundary so it has time to load + seek,
+ *                                  but NOT from frame 0 (would double the
+ *                                  bandwidth and cause buffering in Player)
  *   3. AddressCard               — visible during the veo phase
  *   4. AssetCards                — start animating in during the last 2s
  *                                  of the veo phase, persist through freeze
  *   5. BrandingCard              — mounts at the start of the freeze phase
  */
+
+// How many frames before the freeze boundary to mount the freeze video.
+// Long enough for the browser to load + seek (~1s); short enough to avoid
+// bandwidth-doubling for most of the playback.
+const FREEZE_PRELOAD_FRAMES = COMPOSITION_FPS;
+
 export const FinalizeVideo: React.FC<FinalizeVideoProps> = ({
   veoUrl,
   veoDurationSeconds,
@@ -109,6 +116,12 @@ export const FinalizeVideo: React.FC<FinalizeVideoProps> = ({
 
   const inFreezePhase = frame >= veoFrames;
 
+  // Mount the freeze video shortly before the boundary so it has time to
+  // load + seek without doubling bandwidth for the entire veo phase. The
+  // live video stays mounted throughout (with opacity 0 after the boundary)
+  // so it can be deduped from the browser cache.
+  const showFreezeVideo = frame >= veoFrames - FREEZE_PRELOAD_FRAMES;
+
   // Address card fades out as the asset cards start entering — same window.
   // Pass the fade-out frame so the AddressCard owns its own timing.
   const addressFadeOutAtFrame = assetEntryStartFrame;
@@ -124,14 +137,18 @@ export const FinalizeVideo: React.FC<FinalizeVideoProps> = ({
       </AbsoluteFill>
 
       {/*
-        Frozen final frame. Also always mounted, so it has the entire veo
-        phase to load and seek — no flash when it becomes visible.
+        Frozen final frame. Mounted only during the pre-load window + freeze
+        phase to avoid bandwidth-doubling earlier in playback (which caused
+        Player buffering hiccups when both video elements were independently
+        downloading the same source).
       */}
-      <AbsoluteFill style={{ opacity: inFreezePhase ? 1 : 0 }}>
-        <Freeze frame={freezeAtFrame}>
-          <OffthreadVideo src={veoUrl} />
-        </Freeze>
-      </AbsoluteFill>
+      {showFreezeVideo && (
+        <AbsoluteFill style={{ opacity: inFreezePhase ? 1 : 0 }}>
+          <Freeze frame={freezeAtFrame}>
+            <OffthreadVideo src={veoUrl} />
+          </Freeze>
+        </AbsoluteFill>
+      )}
 
       {/* Address card — visible during the veo phase only */}
       {address && !inFreezePhase && (
