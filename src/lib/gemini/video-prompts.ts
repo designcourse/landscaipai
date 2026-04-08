@@ -139,9 +139,19 @@ export const TRANSITION_PRESETS: readonly TransitionPreset[] = [
     name: "Natural Morph",
     description: "Smooth, physically plausible transition between the two states.",
     promptFragment:
-      "Smoothly and naturally morph the first scene into the second scene over the full duration. " +
-      "Match lighting, perspective, and camera framing exactly. No hard cuts, no dissolves — a continuous, " +
-      "physically plausible transformation of the landscaping elements from start to end.",
+      "Strict interpolation between the two reference frames only. Smoothly and naturally morph the " +
+      "first frame into the last frame over the full duration. " +
+      "ABSOLUTELY CRITICAL constraint: every visible element at every moment in the video must be " +
+      "directly attributable to either the first reference frame or the last reference frame. " +
+      "Do NOT introduce any new objects, plants, trees, shrubs, flowers, hardscape, structures, " +
+      "buildings, vehicles, animals, people, weather effects, or any other content that is not " +
+      "present in one of the two given frames. If a plant exists only in the last frame, it should " +
+      "fade in or grow in over time from where it ends up. If an object exists only in the first " +
+      "frame, it should fade out or transform smoothly. Treat the video strictly as a temporal " +
+      "interpolation problem — NOT a creative generation. Match lighting, perspective, and camera " +
+      "framing exactly between the two frames. No hard cuts, no dissolves to unrelated content, " +
+      "no interstitial scenes, no transitional imagery — a continuous, physically plausible " +
+      "transformation of ONLY the landscaping elements that appear in the two frames.",
   },
   {
     id: "timelapse_growth",
@@ -239,6 +249,10 @@ export function buildVideoPrompt(opts: {
   const parts: string[] = [
     "Cinematic landscape architecture video using first-frame-to-last-frame interpolation. " +
       "The video MUST begin exactly on the first reference frame and end exactly on the last reference frame. " +
+      "The intermediate frames must be a smooth interpolation between ONLY the visual content present " +
+      "in the two given reference frames — do NOT hallucinate or invent any objects, plants, structures, " +
+      "people, vehicles, or other elements that are not present in either the first frame or the last frame. " +
+      "Treat this as a strict visual interpolation task, not creative generation. " +
       "Photorealistic, professional cinematography quality.",
   ];
 

@@ -133,7 +133,7 @@ export const FinalizeVideo: React.FC<FinalizeVideoProps> = ({
         cross into the freeze phase.
       */}
       <AbsoluteFill style={{ opacity: inFreezePhase ? 0 : 1 }}>
-        <OffthreadVideo src={veoUrl} />
+        <OffthreadVideo src={veoUrl} muted />
       </AbsoluteFill>
 
       {/*
@@ -145,7 +145,7 @@ export const FinalizeVideo: React.FC<FinalizeVideoProps> = ({
       {showFreezeVideo && (
         <AbsoluteFill style={{ opacity: inFreezePhase ? 1 : 0 }}>
           <Freeze frame={freezeAtFrame}>
-            <OffthreadVideo src={veoUrl} />
+            <OffthreadVideo src={veoUrl} muted />
           </Freeze>
         </AbsoluteFill>
       )}
