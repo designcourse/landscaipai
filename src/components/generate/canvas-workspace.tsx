@@ -206,6 +206,31 @@ export function CanvasWorkspace({
   // Parallel ordered list to preserve selection order (first = start frame for video)
   const [selectionOrder, setSelectionOrder] = useState<string[]>([]);
 
+  // After router.refresh() (e.g. when a video finalization completes), the
+  // server component re-runs and passes new initialVideoFinalizations down
+  // as a prop. The useState initializer above only runs once on mount, so
+  // without this effect the new finalized cards never make it into local
+  // state. Merge any newly-arrived finalizations in without disturbing
+  // existing items (which may include locally-added generation placeholders
+  // that haven't been persisted yet).
+  useEffect(() => {
+    setCanvasItems((prev) => {
+      const existingIds = new Set(prev.map((i) => i.id));
+      const fresh = buildCanvasItems(
+        initialImages,
+        initialGenerations,
+        initialVideoGenerations,
+        initialVideoFinalizations
+      );
+      const newOnes = fresh.filter((item) => !existingIds.has(item.id));
+      if (newOnes.length === 0) return prev;
+      return [...prev, ...newOnes];
+    });
+    // We intentionally only watch initialVideoFinalizations — generations and
+    // images get added to local state via the existing imperative flows.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialVideoFinalizations]);
+
   // Video generation state
   const [videoModalOpen, setVideoModalOpen] = useState(false);
   const [videoSubmitting, setVideoSubmitting] = useState(false);
