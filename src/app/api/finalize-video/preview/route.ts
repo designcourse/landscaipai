@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { collectAssetsForVideo } from "@/lib/finalize/collect-assets";
+import { collectAssetsForVideo, enrichAssets } from "@/lib/finalize/collect-assets";
 import {
   BUCKET_COMPANY_LOGOS,
   BUCKET_VIDEOS,
@@ -80,8 +80,10 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // Auto-detect assets from the parent generation chain
-  const detectedAssets = await collectAssetsForVideo(admin, video.id);
+  // Auto-detect assets from the parent generation chain, then enrich with
+  // full library_items attributes for the plant info card sequence.
+  const rawAssets = await collectAssetsForVideo(admin, video.id);
+  const detectedAssets = await enrichAssets(admin, rawAssets);
 
   // Company branding (read server-side so it can't be spoofed by the client)
   const { data: companySettings } = await admin

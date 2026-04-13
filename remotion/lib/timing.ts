@@ -30,5 +30,12 @@ export const ADDRESS_CARD_FADE_FRAMES = 14; // ~0.45s @ 30fps
 export const BRANDING_ELEMENT_ENTRY_FRAMES = 16; // ~0.53s @ 30fps
 export const BRANDING_ELEMENT_STAGGER_FRAMES = 6; // 0.2s @ 30fps
 
+// Plant info card sequence (shown after branding card, one per asset).
+export const PLANT_INFO_SECONDS_PER_ASSET = 5;
+export const PLANT_INFO_ENTER_FRAMES = 30; // 1s @ 30fps
+export const PLANT_INFO_EXIT_FRAMES = 18; // 0.6s @ 30fps
+export const PLANT_INFO_PILL_STAGGER_FRAMES = 3; // 0.1s between pills
+export const PLANT_INFO_TEXT_STAGGER_FRAMES = 4; // stagger between title → desc → pills
+
 export const seconds = (n: number, fps: number = COMPOSITION_FPS) =>
   Math.round(n * fps);

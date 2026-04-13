@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@google/genai": "^1.44.0",
+    "@remotion/google-fonts": "^4.0.447",
     "@remotion/lambda": "^4.0.447",
     "@remotion/media-parser": "^4.0.447",
     "@remotion/player": "^4.0.447",

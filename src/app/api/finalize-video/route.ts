@@ -27,9 +27,25 @@ const MAX_TEXT_LENGTH = 500;
 // Lambdas.
 const FRAMES_PER_LAMBDA = 100;
 
+type FinalizeRequestAsset = {
+  name: string;
+  thumbnailUrl: string;
+  description: string | null;
+  zoneMin: string | null;
+  zoneMax: string | null;
+  heightMinFt: number | null;
+  heightMaxFt: number | null;
+  spreadMinFt: number | null;
+  spreadMaxFt: number | null;
+  sunRequirement: string | null;
+  waterNeeds: string | null;
+  growthRate: string | null;
+  maintenanceLevel: string | null;
+};
+
 type FinalizeRequestBody = {
   videoGenerationId: string;
-  assets: { name: string; thumbnailUrl: string }[];
+  assets: FinalizeRequestAsset[];
   address: string | null;
   note: string | null;
 };
@@ -114,6 +130,17 @@ export async function POST(req: NextRequest) {
     .map((a) => ({
       name: a.name.trim().slice(0, 100),
       thumbnailUrl: a.thumbnailUrl.trim(),
+      description: typeof a.description === "string" ? a.description.slice(0, 500) : null,
+      zoneMin: typeof a.zoneMin === "string" ? a.zoneMin : null,
+      zoneMax: typeof a.zoneMax === "string" ? a.zoneMax : null,
+      heightMinFt: typeof a.heightMinFt === "number" ? a.heightMinFt : null,
+      heightMaxFt: typeof a.heightMaxFt === "number" ? a.heightMaxFt : null,
+      spreadMinFt: typeof a.spreadMinFt === "number" ? a.spreadMinFt : null,
+      spreadMaxFt: typeof a.spreadMaxFt === "number" ? a.spreadMaxFt : null,
+      sunRequirement: typeof a.sunRequirement === "string" ? a.sunRequirement : null,
+      waterNeeds: typeof a.waterNeeds === "string" ? a.waterNeeds : null,
+      growthRate: typeof a.growthRate === "string" ? a.growthRate : null,
+      maintenanceLevel: typeof a.maintenanceLevel === "string" ? a.maintenanceLevel : null,
     }));
 
   const admin = createAdminClient();

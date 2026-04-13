@@ -107,6 +107,17 @@ export default async function FinalizePreviewPage({
           assets={detectedAssets.map((a) => ({
             name: a.name,
             thumbnailUrl: a.thumbnail_url,
+            description: null,
+            zoneMin: null,
+            zoneMax: null,
+            heightMinFt: null,
+            heightMaxFt: null,
+            spreadMinFt: null,
+            spreadMaxFt: null,
+            sunRequirement: null,
+            waterNeeds: null,
+            growthRate: null,
+            maintenanceLevel: null,
           }))}
           address="1234 Maple Avenue, Springfield"
           branding={

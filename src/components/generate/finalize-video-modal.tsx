@@ -9,6 +9,7 @@ import {
 import {
   COMPOSITION_FPS,
   FREEZE_HOLD_SECONDS,
+  PLANT_INFO_SECONDS_PER_ASSET,
 } from "../../../remotion/lib/timing";
 import type { LibraryItem } from "@/types";
 import { PlantBrowser } from "./plant-browser";
@@ -21,6 +22,17 @@ interface DetectedAsset {
   id: string;
   name: string;
   thumbnail_url: string;
+  description: string | null;
+  zone_min: string | null;
+  zone_max: string | null;
+  height_min_ft: number | null;
+  height_max_ft: number | null;
+  spread_min_ft: number | null;
+  spread_max_ft: number | null;
+  sun_requirement: string | null;
+  water_needs: string | null;
+  growth_rate: string | null;
+  maintenance_level: string | null;
 }
 
 interface PreviewData {
@@ -124,13 +136,38 @@ export function FinalizeVideoModal({
     if (!previewData) return [];
     const detected = previewData.detectedAssets
       .filter((a) => !removedDetectedNames.has(a.name))
-      .map((a) => ({ name: a.name, thumbnailUrl: a.thumbnail_url }));
+      .map((a) => ({
+        name: a.name,
+        thumbnailUrl: a.thumbnail_url,
+        description: a.description ?? null,
+        zoneMin: a.zone_min ?? null,
+        zoneMax: a.zone_max ?? null,
+        heightMinFt: a.height_min_ft ?? null,
+        heightMaxFt: a.height_max_ft ?? null,
+        spreadMinFt: a.spread_min_ft ?? null,
+        spreadMaxFt: a.spread_max_ft ?? null,
+        sunRequirement: a.sun_requirement ?? null,
+        waterNeeds: a.water_needs ?? null,
+        growthRate: a.growth_rate ?? null,
+        maintenanceLevel: a.maintenance_level ?? null,
+      }));
     const detectedNames = new Set(detected.map((a) => a.name));
     const manual = manualLibraryItems
       .filter((item) => !detectedNames.has(item.common_name))
       .map((item) => ({
         name: item.common_name,
         thumbnailUrl: libraryItemToThumbnailUrl(item),
+        description: item.description ?? null,
+        zoneMin: item.zone_min ?? null,
+        zoneMax: item.zone_max ?? null,
+        heightMinFt: item.height_min_ft ?? null,
+        heightMaxFt: item.height_max_ft ?? null,
+        spreadMinFt: item.spread_min_ft ?? null,
+        spreadMaxFt: item.spread_max_ft ?? null,
+        sunRequirement: item.sun_requirement ?? null,
+        waterNeeds: item.water_needs ?? null,
+        growthRate: item.growth_rate ?? null,
+        maintenanceLevel: item.maintenance_level ?? null,
       }));
     return [...detected, ...manual];
   }, [previewData, removedDetectedNames, manualLibraryItems]);
@@ -163,8 +200,10 @@ export function FinalizeVideoModal({
       previewData.veo.durationSeconds * COMPOSITION_FPS
     );
     const freezeFrames = FREEZE_HOLD_SECONDS * COMPOSITION_FPS;
-    return veoFrames + freezeFrames;
-  }, [previewData]);
+    const plantInfoFrames =
+      assets.length * PLANT_INFO_SECONDS_PER_ASSET * COMPOSITION_FPS;
+    return veoFrames + freezeFrames + plantInfoFrames;
+  }, [previewData, assets.length]);
 
   // ----- Asset chip handlers -----
   const handleRemoveAsset = useCallback(

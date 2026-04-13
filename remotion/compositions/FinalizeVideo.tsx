@@ -16,11 +16,24 @@ import {
   ASSET_CARD_STAGGER_FRAMES,
   COMPOSITION_FPS,
   FREEZE_HOLD_SECONDS,
+  PLANT_INFO_SECONDS_PER_ASSET,
 } from "../lib/timing";
+import { PlantInfoSequence } from "../components/PlantInfoCard";
 
 export type FinalizeVideoAsset = {
   thumbnailUrl: string;
   name: string;
+  description: string | null;
+  zoneMin: string | null;
+  zoneMax: string | null;
+  heightMinFt: number | null;
+  heightMaxFt: number | null;
+  spreadMinFt: number | null;
+  spreadMaxFt: number | null;
+  sunRequirement: string | null;
+  waterNeeds: string | null;
+  growthRate: string | null;
+  maintenanceLevel: string | null;
 };
 
 export type FinalizeVideoBranding = {
@@ -59,9 +72,11 @@ export const calculateFinalizeVideoMetadata: CalculateMetadataFunction<FinalizeV
   ({ props }) => {
     const veoFrames = Math.round(props.veoDurationSeconds * fps);
     const freezeFrames = FREEZE_HOLD_SECONDS * fps;
+    const plantInfoFrames =
+      props.assets.length * PLANT_INFO_SECONDS_PER_ASSET * fps;
 
     return {
-      durationInFrames: veoFrames + freezeFrames,
+      durationInFrames: veoFrames + freezeFrames + plantInfoFrames,
       fps,
       width: props.veoWidth || 1920,
       height: props.veoHeight || 1080,
@@ -176,6 +191,14 @@ export const FinalizeVideo: React.FC<FinalizeVideoProps> = ({
         <Sequence from={veoFrames} layout="none">
           <BrandingCard {...branding} />
         </Sequence>
+      )}
+
+      {/* Plant info slides — full-screen per asset, shown after freeze phase */}
+      {assets.length > 0 && (
+        <PlantInfoSequence
+          assets={assets}
+          startFrame={veoFrames + FREEZE_HOLD_SECONDS * fps}
+        />
       )}
     </AbsoluteFill>
   );
