@@ -23,8 +23,9 @@ const { fontFamily } = loadFont();
 
 const ASSET_FRAMES = PLANT_INFO_SECONDS_PER_ASSET * COMPOSITION_FPS; // 150
 
-// Beige pill background matching the Figma design
-const PILL_BG = "#f9f2e7";
+// Exact colors from Figma design
+const SLIDE_BG = "#FFFFFF";
+const PILL_BG = "#F9F2E7";
 
 /** Format a min/max range into a human-readable string. */
 function formatRange(
@@ -232,7 +233,7 @@ const PlantInfoSlide: React.FC<{
     const dividerGap = Math.round(50 * scale);
 
     return (
-      <AbsoluteFill style={{ backgroundColor: "white" }}>
+      <AbsoluteFill style={{ backgroundColor: SLIDE_BG }}>
         <div
           style={{
             width: "100%",
@@ -335,7 +336,7 @@ const PlantInfoSlide: React.FC<{
   const imageTextGap = Math.round(30 * scale);
 
   return (
-    <AbsoluteFill style={{ backgroundColor: "white" }}>
+    <AbsoluteFill style={{ backgroundColor: SLIDE_BG }}>
       <div
         style={{
           width: "100%",
