@@ -17,6 +17,23 @@
 | `warning` | `#F59E0B` | Warnings, low-credit alerts |
 | `success` | `#16A34A` | Success confirmations |
 
+### Panel Tokens (warm floating panels — plant library, etc.)
+
+| Token | Hex | Usage |
+|-------|-----|-------|
+| `panel` | `#FBF9F5` | Panel chrome bg (title bar, footer) |
+| `panel-subtle` | `#FAF7F0` | Side rail / drawer bg |
+| `panel-main` | `#FAFAFA` | Main content area inside a panel |
+| `panel-search` | `#E9E5D9` | Search input container row bg |
+| `panel-subheader` | `#F0ECE2` | Sub-header row (active filter strip) |
+| `panel-border` | `#EFEADD` | Panel dividers (weakest warm border) |
+| `panel-border-strong` | `#E7E1D1` | Card outlines within a panel |
+| `panel-input-border` | `#E0D9C7` | Inputs inside a panel |
+| `panel-placeholder` | `#686358` | Placeholder text inside a panel |
+| `panel-muted` | `#86837B` | Warm muted text inside a panel |
+| `panel-chip` | `#E2DBCA` | Active filter chip bg |
+| `primary-tint` | `#D8E6D3` | Active rail/menu item tint |
+
 ## Typography
 
 - **Font family (sans):** Geist Sans (`--font-sans`)
@@ -63,6 +80,7 @@ Use Tailwind's default spacing scale via theme tokens. Key named spacers:
 | `--shadow-sm` | `0 1px 2px rgba(0,0,0,0.05)` | Subtle elevation (cards) |
 | `--shadow-md` | `0 4px 6px rgba(0,0,0,0.07)` | Dropdowns, popovers |
 | `--shadow-lg` | `0 10px 15px rgba(0,0,0,0.1)` | Modals, overlays |
+| `--shadow-toolbar` | `0px 12px 22.4px 0px rgba(0,0,0,0.12)` | Canvas toolbar & floating panels (plant library, etc.) |
 
 ## Design Principles
 
