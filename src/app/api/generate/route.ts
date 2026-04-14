@@ -6,6 +6,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { deductCredit, refundCredit } from "@/lib/utils/credits";
 import { buildPrompt } from "@/lib/gemini/prompts";
 import { getGenerationPath, BUCKET_GENERATIONS, BUCKET_UPLOADS, fetchLibraryImageParts } from "@/lib/utils/storage";
+import { withGeminiRetry, friendlyGeminiError } from "@/lib/gemini/with-retry";
+
+// Allow up to 3 retry attempts of a ~10-20s Gemini call inside one request.
+export const maxDuration = 60;
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
@@ -216,21 +220,26 @@ export async function POST(request: NextRequest) {
       }
       parts.push({ text: prompt });
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3.1-flash-image-preview",
-        contents: [
-          {
-            role: "user",
-            parts,
-          },
-        ],
-        config: {
-          responseModalities: ["TEXT", "IMAGE"],
-          imageConfig: {
-            imageSize,
+      const response = await withGeminiRetry(
+        () =>
+          ai.models.generateContent({
+            model: "gemini-3.1-flash-image-preview",
+            contents: [{ role: "user", parts }],
+            config: {
+              responseModalities: ["TEXT", "IMAGE"],
+              imageConfig: { imageSize },
+            },
+          }),
+        {
+          onRetry: (err, attempt, nextDelayMs) => {
+            const msg = err instanceof Error ? err.message : String(err);
+            console.warn(
+              `[generate] transient Gemini error on attempt ${attempt}, retrying in ${Math.round(nextDelayMs)}ms:`,
+              msg,
+            );
           },
         },
-      });
+      );
 
       for (const part of response.candidates?.[0]?.content?.parts ?? []) {
         if (part.inlineData?.data) {
@@ -246,14 +255,15 @@ export async function POST(request: NextRequest) {
       // Refund credit on AI failure
       await refundCredit(user.id, generationId);
 
-      const message =
+      const rawMessage =
         err instanceof Error ? err.message : "AI generation failed";
+      const userMessage = friendlyGeminiError(err);
       await admin
         .from("generations")
-        .update({ status: "failed", error_message: message })
+        .update({ status: "failed", error_message: rawMessage })
         .eq("id", generationId);
 
-      return NextResponse.json({ error: message }, { status: 500 });
+      return NextResponse.json({ error: userMessage }, { status: 502 });
     }
 
     // 9. Upload generated image to storage
