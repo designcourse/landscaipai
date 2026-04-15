@@ -129,3 +129,20 @@ body {
 .scrollbar-minimal::-webkit-scrollbar-corner {
   background: transparent;
 }
+
+/* -----------------------------------------------------------------------
+ * Suppress Chrome/Safari autofill tint on inputs inside panels. Browsers
+ * paint an internal yellow/blue background-color on autofilled fields that
+ * ignores normal `background-color`. Override it via the box-shadow trick.
+ * Apply via `className="no-autofill-tint"`.
+ * ----------------------------------------------------------------------- */
+.no-autofill-tint:-webkit-autofill,
+.no-autofill-tint:-webkit-autofill:hover,
+.no-autofill-tint:-webkit-autofill:focus,
+.no-autofill-tint:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
+  box-shadow: 0 0 0 1000px #ffffff inset !important;
+  -webkit-text-fill-color: var(--color-foreground) !important;
+  caret-color: var(--color-foreground);
+  transition: background-color 5000s ease-in-out 0s;
+}

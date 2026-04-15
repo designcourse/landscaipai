@@ -13,10 +13,26 @@ import {
 } from "../../../remotion/lib/timing";
 import type { LibraryItem } from "@/types";
 import { PlantBrowser } from "./plant-browser";
+import { useFloatingPanel } from "@/hooks/use-floating-panel";
+import { useIsMobile } from "@/hooks/use-is-mobile";
+import {
+  CloseIcon,
+  MaximizeIcon,
+  GripIcon,
+  ResizeHandleIcon,
+} from "./plant-browser-icons";
 
 const NOTE_MAX_LENGTH = 500;
 const ADDRESS_MAX_LENGTH = 200;
 const POLL_INTERVAL_MS = 2500;
+
+// Panel chrome sizing — same conventions as Plant Library + Video modal.
+const TOP_GUTTER = 72;
+const BOTTOM_GUTTER = 110;
+const DEFAULT_WIDTH = 1080;
+const DEFAULT_HEIGHT = 660;
+const MIN_WIDTH = 720;
+const MIN_HEIGHT = 540;
 
 interface DetectedAsset {
   id: string;
@@ -85,8 +101,7 @@ export function FinalizeVideoModal({
 
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
 
-  // Asset state — split between auto-detected (from preview) and manually
-  // added (from PlantBrowser). The chip list is the deduped union.
+  // Asset state — detected from preview vs manually added via the browser.
   const [removedDetectedNames, setRemovedDetectedNames] = useState<Set<string>>(
     new Set()
   );
@@ -101,6 +116,37 @@ export function FinalizeVideoModal({
   const [finalizationId, setFinalizationId] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [outputUrl, setOutputUrl] = useState<string | null>(null);
+
+  // Mobile takeover — same pattern as Plant Library + Video modal.
+  const isMobile = useIsMobile();
+
+  // Floating-panel bounds (drag/resize/maximize).
+  const { bounds, maximized, dragHandlers, resizeHandlers, toggleMaximize } =
+    useFloatingPanel({
+      storageKey: "finalize-video-bounds-v1",
+      initial: (() => {
+        if (typeof window === "undefined") {
+          return { x: 200, y: TOP_GUTTER + 24, width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT };
+        }
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        const width = Math.min(DEFAULT_WIDTH, vw - 32);
+        const height = Math.min(DEFAULT_HEIGHT, vh - TOP_GUTTER - BOTTOM_GUTTER);
+        return {
+          x: Math.max(16, Math.round((vw - width) / 2)),
+          y: Math.max(
+            TOP_GUTTER,
+            Math.round((vh - height - BOTTOM_GUTTER) / 2) + TOP_GUTTER / 2,
+          ),
+          width,
+          height,
+        };
+      })(),
+      minWidth: MIN_WIDTH,
+      minHeight: MIN_HEIGHT,
+      topGutter: TOP_GUTTER,
+      bottomGutter: BOTTOM_GUTTER,
+    });
 
   // ----- Fetch preview data on mount -----
   useEffect(() => {
@@ -130,6 +176,21 @@ export function FinalizeVideoModal({
       cancelled = true;
     };
   }, [videoGenerationId]);
+
+  // Close on Escape (matches the rest of the floating-panel family).
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape" && phase !== "rendering") {
+        if (browserOpen) {
+          // Let the browser handle its own escape first.
+          return;
+        }
+        onClose();
+      }
+    }
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [onClose, phase, browserOpen]);
 
   // ----- Computed assets list (deduped union) -----
   const assets = useMemo(() => {
@@ -173,7 +234,6 @@ export function FinalizeVideoModal({
   }, [previewData, removedDetectedNames, manualLibraryItems]);
 
   // ----- Memoized inputProps for the Player preview -----
-  // Must mirror the shape sent to /api/finalize-video to keep WYSIWYG honest.
   const playerProps: FinalizeVideoProps | null = useMemo(() => {
     if (!previewData) return null;
     return {
@@ -208,7 +268,6 @@ export function FinalizeVideoModal({
   // ----- Asset chip handlers -----
   const handleRemoveAsset = useCallback(
     (name: string) => {
-      // If it was a detected asset, mark it removed
       if (previewData?.detectedAssets.some((a) => a.name === name)) {
         setRemovedDetectedNames((prev) => {
           const next = new Set(prev);
@@ -216,7 +275,6 @@ export function FinalizeVideoModal({
           return next;
         });
       }
-      // If it was a manually-added one, drop it
       setManualLibraryItems((prev) =>
         prev.filter((i) => i.common_name !== name)
       );
@@ -246,12 +304,11 @@ export function FinalizeVideoModal({
         throw new Error(body.error ?? `Render failed (${res.status})`);
       }
 
-      // Cache hit: server already has a completed render
+      // Cache hit: server already has a completed render.
       if (body.cached) {
         setFinalizationId(body.id);
         setProgress(1);
         setPhase("completed");
-        // Fetch the signed URL via the status endpoint
         const statusRes = await fetch(`/api/finalize-video/${body.id}`);
         const statusBody = await statusRes.json().catch(() => ({}));
         setOutputUrl(statusBody.outputUrl ?? null);
@@ -297,11 +354,9 @@ export function FinalizeVideoModal({
           return;
         }
 
-        // Continue polling
         timeoutId = setTimeout(poll, POLL_INTERVAL_MS);
       } catch (err) {
         if (cancelled) return;
-        // On transient error, just keep polling — don't fail the whole render
         console.warn("Poll error:", err);
         timeoutId = setTimeout(poll, POLL_INTERVAL_MS);
       }
@@ -323,12 +378,6 @@ export function FinalizeVideoModal({
     setBrowserOpen(false);
   }, []);
 
-  // ----- Backdrop click should not close during render -----
-  const handleBackdropClick = useCallback(() => {
-    if (phase === "rendering") return; // Don't allow accidental cancel
-    onClose();
-  }, [phase, onClose]);
-
   const canSubmit =
     phase === "configuring" &&
     previewData !== null &&
@@ -338,386 +387,443 @@ export function FinalizeVideoModal({
   const brandingMissing =
     phase !== "loading" && previewData !== null && previewData.branding === null;
 
+  const isRendering = phase === "rendering";
+  const isLocked = isRendering;
+
+  // Mobile = fullscreen takeover; desktop = floating panel.
+  const panelStyle: React.CSSProperties = isMobile
+    ? { left: 0, top: 0, width: "100vw", height: "100dvh", boxShadow: "none" }
+    : {
+        left: bounds.x,
+        top: bounds.y,
+        width: bounds.width,
+        height: bounds.height,
+        boxShadow: "var(--shadow-toolbar)",
+      };
+
+  const footerHint =
+    phase === "configuring"
+      ? "1 credit will be used."
+      : phase === "rendering"
+        ? "Render in progress — please wait."
+        : phase === "completed"
+          ? "Done."
+          : phase === "failed"
+            ? "Render failed."
+            : "Loading preview…";
+
   return (
     <>
       <div
-        className="fixed inset-0 z-[250] flex items-center justify-center"
-        style={{ backgroundColor: "rgba(0, 0, 0, 0.6)" }}
-        onClick={handleBackdropClick}
+        role="dialog"
+        aria-label="Finalize Video"
+        className={`fixed z-40 flex flex-col overflow-hidden bg-panel-main ${
+          isMobile ? "" : "rounded-lg border border-panel-border"
+        }`}
+        style={panelStyle}
       >
+        {/* Title bar */}
         <div
-          className="max-h-[92vh] w-full max-w-6xl overflow-hidden rounded-lg"
-          style={{
-            backgroundColor: "var(--color-background)",
-            border: "1px solid var(--color-border)",
-            boxShadow: "var(--shadow-toolbar)",
-          }}
-          onClick={(e) => e.stopPropagation()}
+          className="flex h-[52px] shrink-0 select-none items-center gap-2.5 border-b border-panel-border bg-panel pl-4 pr-2.5"
+          style={{ cursor: isMobile || maximized ? "default" : "grab" }}
+          {...(isMobile ? {} : dragHandlers)}
         >
-          {/* Header */}
-          <div
-            className="flex items-center justify-between border-b px-6 py-4"
-            style={{ borderColor: "var(--color-border)" }}
-          >
-            <div className="flex items-center gap-3">
-              <div
-                className="flex h-9 w-9 items-center justify-center rounded-full"
-                style={{ backgroundColor: "var(--color-primary)" }}
-              >
-                <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-foreground">
-                  Finalize Video
-                </h2>
-                <p className="text-xs text-muted-foreground">
-                  Add branding + assets, then render a polished version to send to clients.
-                </p>
-              </div>
-            </div>
+          {!isMobile && (
+            <span className="text-muted-foreground/60" aria-hidden>
+              <GripIcon className="h-3.5 w-3.5" />
+            </span>
+          )}
+          <h2 className="text-[13px] font-semibold text-foreground">
+            Finalize Video
+          </h2>
+          <span
+            aria-hidden
+            className="hidden h-[14px] w-px shrink-0 bg-panel-border sm:block"
+          />
+          <p className="hidden text-[12px] font-medium text-panel-muted sm:block">
+            Add branding + assets to render a polished version
+          </p>
+
+          <div className="flex flex-1" />
+
+          {!isMobile && (
             <button
-              onClick={onClose}
-              disabled={phase === "rendering"}
-              className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted disabled:opacity-30"
-              aria-label="Close"
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleMaximize();
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="flex h-[30px] w-[30px] cursor-pointer items-center justify-center rounded-md text-foreground/70 transition-colors hover:bg-panel-subtle hover:text-foreground"
+              title={maximized ? "Restore" : "Maximize"}
+              aria-label={maximized ? "Restore" : "Maximize"}
             >
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              <MaximizeIcon />
             </button>
+          )}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!isLocked) onClose();
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            disabled={isLocked}
+            className="flex h-[30px] w-[30px] cursor-pointer items-center justify-center rounded-md text-foreground/70 transition-colors hover:bg-panel-subtle hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+            title="Close"
+            aria-label="Close"
+          >
+            <CloseIcon />
+          </button>
+        </div>
+
+        {/* Body — split: player on left (panel-search bg), form on right (panel-subtle bg) */}
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row">
+          {/* Left pane — player preview */}
+          <div className="flex flex-[3] items-center justify-center overflow-hidden bg-panel-search p-6">
+            {phase === "loading" && (
+              <div className="flex flex-col items-center gap-3 text-sm text-panel-muted">
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                Loading preview…
+              </div>
+            )}
+            {previewData && playerProps && (
+              <div
+                className="overflow-hidden rounded-md bg-black"
+                style={{
+                  aspectRatio: `${previewData.veo.width} / ${previewData.veo.height}`,
+                  // Fill the pane while preserving aspect ratio:
+                  //   height fills the pane, width follows from aspect-ratio,
+                  //   and max-width clamps width when the pane is narrower
+                  //   than the computed width (aspect-ratio then shrinks height
+                  //   to match). Works both when the pane is wider-than-aspect
+                  //   and taller-than-aspect, and scales up when maximized.
+                  height: "100%",
+                  width: "auto",
+                  maxWidth: "100%",
+                  maxHeight: "100%",
+                }}
+              >
+                <Player
+                  component={FinalizeVideo}
+                  inputProps={playerProps}
+                  durationInFrames={playerDuration}
+                  compositionWidth={previewData.veo.width}
+                  compositionHeight={previewData.veo.height}
+                  fps={COMPOSITION_FPS}
+                  controls
+                  loop={false}
+                  style={{ width: "100%", height: "100%" }}
+                />
+              </div>
+            )}
           </div>
 
-          {/* Body — two columns */}
-          <div className="grid max-h-[calc(92vh-140px)] grid-cols-1 overflow-y-auto md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-            {/* Left: Player preview */}
-            <div className="flex items-center justify-center bg-black p-4">
-              {phase === "loading" && (
-                <div className="text-sm text-white/60">Loading preview…</div>
-              )}
-              {previewData && playerProps && (
-                <div
-                  className="w-full overflow-hidden rounded-md"
-                  style={{
-                    aspectRatio: `${previewData.veo.width} / ${previewData.veo.height}`,
-                  }}
-                >
-                  <Player
-                    component={FinalizeVideo}
-                    inputProps={playerProps}
-                    durationInFrames={playerDuration}
-                    compositionWidth={previewData.veo.width}
-                    compositionHeight={previewData.veo.height}
-                    fps={COMPOSITION_FPS}
-                    controls
-                    loop={false}
-                    style={{ width: "100%", height: "100%" }}
-                  />
-                </div>
-              )}
-            </div>
+          {/* Vertical divider — desktop only; horizontal divider on mobile */}
+          <div className="h-px w-full shrink-0 bg-panel-border md:h-auto md:w-px" />
 
-            {/* Right: Form / Progress / Completed / Failed */}
-            <div
-              className="flex flex-col gap-5 border-l p-6"
-              style={{ borderColor: "var(--color-border)" }}
-            >
-              {phase === "loading" && (
-                <p className="text-sm text-muted-foreground">Loading…</p>
-              )}
+          {/* Right pane — form / progress / completed / failed */}
+          <div
+            className="scrollbar-minimal flex flex-[2] min-h-0 flex-col gap-4 overflow-y-auto p-[22px]"
+            style={{ backgroundColor: "var(--color-panel-subtle)" }}
+          >
+            {phase === "loading" && (
+              <p className="text-sm text-panel-muted">Loading…</p>
+            )}
 
-              {(phase === "configuring" || phase === "rendering") &&
-                previewData && (
-                  <>
-                    {/* Assets section */}
-                    <section className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-semibold text-foreground">
-                          Assets
-                        </h3>
-                        <button
-                          type="button"
-                          disabled={phase === "rendering"}
-                          onClick={() => setBrowserOpen(true)}
-                          className="text-xs font-medium text-primary hover:underline disabled:opacity-50"
+            {(phase === "configuring" || phase === "rendering") && previewData && (
+              <>
+                {/* Assets section */}
+                <section className="flex flex-col gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <SectionLabel>ASSETS</SectionLabel>
+                    {assets.length > 0 && (
+                      <span className="text-[11px] font-medium text-panel-muted">
+                        · {assets.length}
+                      </span>
+                    )}
+                    <div className="flex-1" />
+                    <button
+                      type="button"
+                      disabled={isLocked}
+                      onClick={() => setBrowserOpen(true)}
+                      className="cursor-pointer text-[11px] font-semibold text-primary transition-colors hover:text-primary-light disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      + Add asset
+                    </button>
+                  </div>
+                  {assets.length === 0 ? (
+                    <p className="text-[12px] text-panel-muted">
+                      None detected from this video&apos;s history. Add some
+                      manually.
+                    </p>
+                  ) : (
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {assets.map((asset) => (
+                        <span
+                          key={asset.name}
+                          className="inline-flex h-[26px] items-center gap-1.5 rounded-full border border-panel-border bg-white py-[3px] pl-1 pr-2 text-[11px] font-semibold text-foreground"
                         >
-                          + Add asset
-                        </button>
-                      </div>
-                      {assets.length === 0 ? (
-                        <p className="text-xs text-muted-foreground">
-                          No assets — none were detected in this video&apos;s
-                          history. Add some manually.
-                        </p>
-                      ) : (
-                        <div className="flex flex-wrap gap-2">
-                          {assets.map((asset) => (
-                            <div
-                              key={asset.name}
-                              className="group flex items-center gap-2 rounded-md border bg-background px-2 py-1 text-xs"
-                              style={{ borderColor: "var(--color-border)" }}
-                            >
-                              {asset.thumbnailUrl && (
-                                /* eslint-disable-next-line @next/next/no-img-element */
-                                <img
-                                  src={asset.thumbnailUrl}
-                                  alt={asset.name}
-                                  className="h-6 w-6 rounded object-contain"
-                                />
-                              )}
-                              <span className="font-medium text-foreground">
-                                {asset.name}
-                              </span>
-                              <button
-                                type="button"
-                                disabled={phase === "rendering"}
-                                onClick={() => handleRemoveAsset(asset.name)}
-                                className="text-muted-foreground transition-colors hover:text-destructive disabled:opacity-30"
-                                aria-label={`Remove ${asset.name}`}
-                              >
-                                ×
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </section>
-
-                    {/* Address */}
-                    <section className="space-y-2">
-                      <label
-                        htmlFor="finalize-address"
-                        className="block text-sm font-semibold text-foreground"
-                      >
-                        Property address (optional)
-                      </label>
-                      <input
-                        id="finalize-address"
-                        type="text"
-                        value={address}
-                        onChange={(e) =>
-                          setAddress(
-                            e.target.value.slice(0, ADDRESS_MAX_LENGTH)
-                          )
-                        }
-                        disabled={phase === "rendering"}
-                        placeholder="1234 Maple Avenue, Springfield"
-                        className="block w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
-                        maxLength={ADDRESS_MAX_LENGTH}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Shown in the bottom-left for the duration of the video.
-                      </p>
-                    </section>
-
-                    {/* Note */}
-                    <section className="space-y-2">
-                      <label
-                        htmlFor="finalize-note"
-                        className="block text-sm font-semibold text-foreground"
-                      >
-                        Closing note (optional)
-                      </label>
-                      <textarea
-                        id="finalize-note"
-                        value={note}
-                        onChange={(e) =>
-                          setNote(e.target.value.slice(0, NOTE_MAX_LENGTH))
-                        }
-                        disabled={phase === "rendering"}
-                        rows={3}
-                        placeholder="Contact us today and we can make this happen."
-                        className="block w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
-                        maxLength={NOTE_MAX_LENGTH}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        {note.length}/{NOTE_MAX_LENGTH} characters
-                      </p>
-                    </section>
-
-                    {/* Branding summary */}
-                    <section className="space-y-2">
-                      <h3 className="text-sm font-semibold text-foreground">
-                        Branding
-                      </h3>
-                      {brandingMissing ? (
-                        <div
-                          className="rounded-md border bg-muted p-3 text-xs"
-                          style={{ borderColor: "var(--color-border)" }}
-                        >
-                          <p className="font-medium text-foreground">
-                            Set up your company branding first.
-                          </p>
-                          <p className="mt-1 text-muted-foreground">
-                            <a
-                              href="/account#branding"
-                              className="font-medium text-primary hover:underline"
-                            >
-                              Go to Account Settings →
-                            </a>
-                          </p>
-                        </div>
-                      ) : (
-                        <div
-                          className="flex items-center gap-3 rounded-md border bg-background p-3"
-                          style={{ borderColor: "var(--color-border)" }}
-                        >
-                          {previewData.branding?.logoUrl && (
+                          {asset.thumbnailUrl ? (
                             /* eslint-disable-next-line @next/next/no-img-element */
                             <img
-                              src={previewData.branding.logoUrl}
-                              alt="Logo"
-                              className="h-10 w-10 rounded border object-contain"
-                              style={{ borderColor: "var(--color-border)" }}
+                              src={asset.thumbnailUrl}
+                              alt={asset.name}
+                              className="h-[18px] w-[18px] rounded-full object-cover"
                             />
+                          ) : (
+                            <span className="h-[18px] w-[18px] rounded-full bg-panel-chip" />
                           )}
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-semibold text-foreground">
-                              {previewData.branding?.companyName ?? "—"}
-                            </p>
-                            {previewData.branding?.companyPhone && (
-                              <p className="truncate text-xs text-muted-foreground">
-                                {previewData.branding.companyPhone}
-                              </p>
-                            )}
-                          </div>
-                          <a
-                            href="/account#branding"
-                            className="text-xs font-medium text-primary hover:underline"
+                          <span>{asset.name}</span>
+                          <button
+                            type="button"
+                            disabled={isLocked}
+                            onClick={() => handleRemoveAsset(asset.name)}
+                            className="ml-0.5 cursor-pointer text-panel-muted transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
+                            aria-label={`Remove ${asset.name}`}
                           >
-                            Edit
-                          </a>
-                        </div>
-                      )}
-                    </section>
-
-                    {phase === "rendering" && (
-                      <section className="space-y-2">
-                        <div className="flex items-center justify-between text-xs text-muted-foreground">
-                          <span>Rendering on Lambda…</span>
-                          <span>{Math.round(progress * 100)}%</span>
-                        </div>
-                        <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                          <div
-                            className="h-full bg-primary transition-all"
-                            style={{ width: `${Math.max(2, progress * 100)}%` }}
-                          />
-                        </div>
-                      </section>
-                    )}
-                  </>
-                )}
-
-              {phase === "completed" && (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                      <svg
-                        className="h-6 w-6 text-primary"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2.5}
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
+                            ×
+                          </button>
+                        </span>
+                      ))}
                     </div>
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">
-                        Finalized video ready
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Added to your canvas next to the source video.
-                      </p>
-                    </div>
-                  </div>
-                  {outputUrl && (
-                    <a
-                      href={outputUrl}
-                      download
-                      className="block rounded-sm bg-primary px-4 py-2.5 text-center text-sm font-medium text-white transition-colors hover:bg-primary-light"
-                    >
-                      Download MP4
-                    </a>
                   )}
-                </div>
-              )}
+                </section>
 
-              {phase === "failed" && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100">
-                      <svg
-                        className="h-6 w-6 text-destructive"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
+                {/* Property address */}
+                <section className="flex flex-col gap-1.5">
+                  <SectionLabel hint="optional">PROPERTY ADDRESS</SectionLabel>
+                  <input
+                    id="finalize-address"
+                    type="text"
+                    value={address}
+                    onChange={(e) =>
+                      setAddress(e.target.value.slice(0, ADDRESS_MAX_LENGTH))
+                    }
+                    disabled={isLocked}
+                    placeholder="1234 Maple Avenue, Springfield"
+                    maxLength={ADDRESS_MAX_LENGTH}
+                    autoComplete="off"
+                    className="no-autofill-tint h-9 w-full rounded-lg border border-panel-border bg-white px-3 text-[13px] text-foreground placeholder:text-panel-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                </section>
+
+                {/* Closing note */}
+                <section className="flex flex-col gap-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <SectionLabel>CLOSING NOTE</SectionLabel>
+                    <div className="flex-1" />
+                    <span className="text-[10px] font-medium text-panel-muted">
+                      {note.length}/{NOTE_MAX_LENGTH}
+                    </span>
+                  </div>
+                  <textarea
+                    id="finalize-note"
+                    value={note}
+                    onChange={(e) =>
+                      setNote(e.target.value.slice(0, NOTE_MAX_LENGTH))
+                    }
+                    disabled={isLocked}
+                    rows={3}
+                    placeholder="Contact us today and we can make this happen."
+                    maxLength={NOTE_MAX_LENGTH}
+                    className="min-h-[64px] w-full resize-none rounded-lg border border-panel-border bg-white px-3 py-2.5 text-[13px] text-foreground placeholder:text-panel-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                </section>
+
+                {/* Branding summary */}
+                <section className="flex flex-col gap-1.5">
+                  <SectionLabel>BRANDING</SectionLabel>
+                  {brandingMissing ? (
+                    <div className="rounded-lg border border-panel-border bg-white p-3 text-[12px]">
+                      <p className="font-semibold text-foreground">
+                        Set up your company branding first.
+                      </p>
+                      <p className="mt-1 text-panel-muted">
+                        <a
+                          href="/account#branding"
+                          className="font-semibold text-primary hover:underline"
+                        >
+                          Go to Account Settings →
+                        </a>
+                      </p>
                     </div>
-                    <p className="text-sm font-semibold text-foreground">
-                      Finalize failed
+                  ) : (
+                    <div className="flex h-[60px] items-center gap-3 rounded-lg border border-panel-border bg-white p-3">
+                      {previewData.branding?.logoUrl ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          src={previewData.branding.logoUrl}
+                          alt="Logo"
+                          className="h-9 w-9 shrink-0 rounded-md border border-panel-border bg-white object-contain"
+                        />
+                      ) : (
+                        <div className="h-9 w-9 shrink-0 rounded-md bg-primary" />
+                      )}
+                      <div className="flex min-w-0 flex-1 flex-col">
+                        <span className="truncate text-[13px] font-semibold text-foreground">
+                          {previewData.branding?.companyName ?? "—"}
+                        </span>
+                        {previewData.branding?.companyPhone && (
+                          <span className="truncate text-[11px] font-medium text-panel-muted">
+                            {previewData.branding.companyPhone}
+                          </span>
+                        )}
+                      </div>
+                      <a
+                        href="/account#branding"
+                        className="cursor-pointer text-[11px] font-semibold text-primary hover:underline"
+                      >
+                        Edit
+                      </a>
+                    </div>
+                  )}
+                </section>
+
+                {/* Render progress */}
+                {phase === "rendering" && (
+                  <section className="flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between text-[11px] text-panel-muted">
+                      <span className="flex items-center gap-1.5">
+                        <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
+                        Rendering on Lambda…
+                      </span>
+                      <span className="font-semibold text-foreground">
+                        {Math.round(progress * 100)}%
+                      </span>
+                    </div>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-panel-border">
+                      <div
+                        className="h-full bg-primary transition-all"
+                        style={{ width: `${Math.max(2, progress * 100)}%` }}
+                      />
+                    </div>
+                  </section>
+                )}
+              </>
+            )}
+
+            {phase === "completed" && (
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                    <svg
+                      className="h-5 w-5 text-primary"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2.5}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-[14px] font-semibold text-foreground">
+                      Finalized video ready
+                    </p>
+                    <p className="text-[12px] text-panel-muted">
+                      Added to your canvas next to the source video.
                     </p>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {errorMessage ?? "Something went wrong. Please try again."}
+                </div>
+                {outputUrl && (
+                  <a
+                    href={outputUrl}
+                    download
+                    className="block cursor-pointer rounded-md bg-primary px-4 py-2.5 text-center text-[13px] font-semibold text-white transition-colors hover:bg-primary-light"
+                  >
+                    Download MP4
+                  </a>
+                )}
+              </div>
+            )}
+
+            {phase === "failed" && (
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10">
+                    <svg
+                      className="h-5 w-5 text-destructive"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                  </div>
+                  <p className="text-[14px] font-semibold text-foreground">
+                    Finalize failed
                   </p>
                 </div>
-              )}
-            </div>
-          </div>
-
-          {/* Footer */}
-          <div
-            className="flex items-center justify-between border-t px-6 py-4"
-            style={{ borderColor: "var(--color-border)" }}
-          >
-            <div className="text-xs text-muted-foreground">
-              {phase === "configuring" && "1 credit will be used."}
-              {phase === "rendering" && "Render in progress — please wait."}
-              {phase === "completed" && "Done."}
-              {phase === "failed" && "Render failed."}
-            </div>
-            <div className="flex gap-3">
-              {phase === "completed" || phase === "failed" ? (
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="rounded-sm border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
-                >
-                  Close
-                </button>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    disabled={phase === "rendering"}
-                    className="rounded-sm border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-30"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSubmit}
-                    disabled={!canSubmit}
-                    className="rounded-sm bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-light disabled:opacity-40"
-                  >
-                    {phase === "rendering" ? "Rendering…" : "Render Final Video"}
-                  </button>
-                </>
-              )}
-            </div>
+                <p className="text-[12px] text-panel-muted">
+                  {errorMessage ?? "Something went wrong. Please try again."}
+                </p>
+              </div>
+            )}
           </div>
         </div>
+
+        {/* Footer */}
+        <div className="flex h-[54px] shrink-0 items-center gap-2.5 border-t border-panel-border bg-panel-subtle px-4">
+          <p className="text-[12px] font-medium text-panel-muted">{footerHint}</p>
+          <div className="flex-1" />
+          {phase === "completed" || phase === "failed" ? (
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-[30px] cursor-pointer items-center justify-center rounded-md border border-panel-border bg-white px-3.5 text-[12px] font-semibold text-foreground/70 transition-colors hover:bg-panel-subtle"
+            >
+              Close
+            </button>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => !isLocked && onClose()}
+                disabled={isLocked}
+                className="flex h-[30px] cursor-pointer items-center justify-center rounded-md border border-panel-border bg-white px-3.5 text-[12px] font-semibold text-foreground/70 transition-colors hover:bg-panel-subtle disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={!canSubmit || isLocked}
+                className="flex h-[30px] cursor-pointer items-center gap-1.5 rounded-md bg-primary px-4 text-[12px] font-semibold text-white transition-colors hover:bg-primary-light disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <SparkleIcon />
+                {isRendering ? "Rendering…" : "Render Final Video"}
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* Resize handle — desktop only */}
+        {!isMobile && !maximized && (
+          <button
+            type="button"
+            aria-label="Resize panel"
+            className="absolute bottom-0 right-0 flex h-4 w-4 items-end justify-end p-0.5 text-muted-foreground/60 hover:text-foreground"
+            style={{ cursor: "nwse-resize", background: "transparent" }}
+            {...resizeHandlers}
+          >
+            <ResizeHandleIcon />
+          </button>
+        )}
       </div>
 
-      {/* Plant browser — floats above the modal at z-[300] */}
+      {/* Plant browser — floats above this modal at z-50 */}
       {browserOpen && (
-        <div className="fixed inset-0 z-[300]">
+        <div className="fixed inset-0 z-50">
           <PlantBrowser
             hardinessZone={hardinessZone}
             selectedItems={manualLibraryItems}
@@ -727,5 +833,46 @@ export function FinalizeVideoModal({
         </div>
       )}
     </>
+  );
+}
+
+// ----------------------------------------------------------------------------
+// Subcomponents
+// ----------------------------------------------------------------------------
+
+function SectionLabel({
+  children,
+  hint,
+}: {
+  children: React.ReactNode;
+  hint?: string;
+}) {
+  return (
+    <span className="flex items-center gap-1.5">
+      <span
+        className="text-[11px] font-bold text-panel-muted"
+        style={{ letterSpacing: "0.6px" }}
+      >
+        {children}
+      </span>
+      {hint && (
+        <span className="text-[11px] font-medium text-panel-muted">
+          · {hint}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function SparkleIcon() {
+  return (
+    <svg
+      className="h-3 w-3"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden
+    >
+      <path d="M12 2L14.09 8.26L20 9.27L15.55 13.97L16.91 20L12 16.9L7.09 20L8.45 13.97L4 9.27L9.91 8.26L12 2Z" />
+    </svg>
   );
 }

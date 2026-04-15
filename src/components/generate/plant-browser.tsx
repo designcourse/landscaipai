@@ -21,6 +21,7 @@ import {
   ResizeHandleIcon,
 } from "./plant-browser-icons";
 import { useFloatingPanel } from "@/hooks/use-floating-panel";
+import { useIsMobile } from "@/hooks/use-is-mobile";
 
 interface PlantBrowserProps {
   hardinessZone: string | null;
@@ -53,6 +54,14 @@ export function PlantBrowser({
   const [zoneFilterEnabled, setZoneFilterEnabled] = useState(!!hardinessZone);
   const [detailItem, setDetailItem] = useState<LibraryItem | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(true);
+
+  // On phones, the panel becomes a fullscreen takeover — the floating chrome
+  // (drag/resize/maximize) doesn't make sense at that size. Default the
+  // filter drawer closed on mobile so the grid gets the full viewport width.
+  const isMobile = useIsMobile();
+  useEffect(() => {
+    if (isMobile) setDrawerOpen(false);
+  }, [isMobile]);
 
   // Floating panel bounds (drag/resize/maximize).
   const {
@@ -286,37 +295,41 @@ export function PlantBrowser({
 
   const hasActiveFilters = activeFilters.size > 0 || zoneFilterEnabled;
 
-  return (
-    <div
-      role="dialog"
-      aria-label="Plant & Material Library"
-      className="fixed z-40 flex flex-col overflow-hidden rounded-lg border border-panel-border bg-white"
-      style={{
+  const panelStyle: React.CSSProperties = isMobile
+    ? { left: 0, top: 0, width: "100vw", height: "100dvh", boxShadow: "none" }
+    : {
         left: bounds.x,
         top: bounds.y,
         width: bounds.width,
         height: bounds.height,
         boxShadow: "var(--shadow-toolbar)",
-      }}
+      };
+
+  return (
+    <div
+      role="dialog"
+      aria-label="Plant & Material Library"
+      className={`fixed z-40 flex flex-col overflow-hidden bg-white ${
+        isMobile ? "" : "rounded-lg border border-panel-border"
+      }`}
+      style={panelStyle}
     >
-      {/* Title bar (draggable) */}
+      {/* Title bar — draggable on desktop, static on mobile */}
       <div
         className="flex h-[52px] shrink-0 select-none items-center gap-2.5 border-b border-panel-border bg-panel pl-4 pr-2.5"
-        style={{ cursor: maximized ? "default" : "grab" }}
-        {...dragHandlers}
+        style={{ cursor: isMobile || maximized ? "default" : "grab" }}
+        {...(isMobile ? {} : dragHandlers)}
       >
-        <span className="text-muted-foreground/60" aria-hidden>
-          <GripIcon className="h-3.5 w-3.5" />
-        </span>
-        <span
-          aria-hidden
-          className="inline-block h-3.5 w-3.5 rounded-full bg-primary"
-        />
+        {!isMobile && (
+          <span className="text-muted-foreground/60" aria-hidden>
+            <GripIcon className="h-3.5 w-3.5" />
+          </span>
+        )}
         <h2 className="text-[13px] font-semibold text-foreground">
           Plant &amp; Material Library
         </h2>
         {hardinessZone && (
-          <span className="flex items-center gap-1.5 rounded-full border border-panel-border bg-white px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+          <span className="hidden items-center gap-1.5 rounded-full border border-panel-border bg-white px-2 py-0.5 text-[11px] font-medium text-muted-foreground sm:flex">
             <span className="h-[5px] w-[5px] rounded-full bg-primary" />
             Zone {hardinessZone.toUpperCase()}
           </span>
@@ -332,7 +345,7 @@ export function PlantBrowser({
               setDrawerOpen((v) => !v);
             }}
             onPointerDown={(e) => e.stopPropagation()}
-            className="flex items-center gap-1.5 rounded-md border border-panel-border bg-white px-2.5 py-1.5 text-[12px] font-semibold text-muted-foreground transition-colors hover:bg-panel-subtle"
+            className="flex cursor-pointer items-center gap-1.5 rounded-md border border-panel-border bg-white px-2.5 py-1.5 text-[12px] font-semibold text-muted-foreground transition-colors hover:bg-panel-subtle"
             title={drawerOpen ? "Hide filters" : "Show filters"}
           >
             <SlidersIcon />
@@ -345,19 +358,21 @@ export function PlantBrowser({
           </button>
         )}
 
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleMaximize();
-          }}
-          onPointerDown={(e) => e.stopPropagation()}
-          className="flex h-[30px] w-[30px] items-center justify-center rounded-md text-foreground/70 transition-colors hover:bg-panel-subtle hover:text-foreground"
-          title={maximized ? "Restore" : "Maximize"}
-          aria-label={maximized ? "Restore" : "Maximize"}
-        >
-          <MaximizeIcon />
-        </button>
+        {!isMobile && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleMaximize();
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="flex h-[30px] w-[30px] cursor-pointer items-center justify-center rounded-md text-foreground/70 transition-colors hover:bg-panel-subtle hover:text-foreground"
+            title={maximized ? "Restore" : "Maximize"}
+            aria-label={maximized ? "Restore" : "Maximize"}
+          >
+            <MaximizeIcon />
+          </button>
+        )}
         <button
           type="button"
           onClick={(e) => {
@@ -365,7 +380,7 @@ export function PlantBrowser({
             onClose();
           }}
           onPointerDown={(e) => e.stopPropagation()}
-          className="flex h-[30px] w-[30px] items-center justify-center rounded-md text-foreground/70 transition-colors hover:bg-panel-subtle hover:text-foreground"
+          className="flex h-[30px] w-[30px] cursor-pointer items-center justify-center rounded-md text-foreground/70 transition-colors hover:bg-panel-subtle hover:text-foreground"
           title="Close"
           aria-label="Close"
         >
@@ -437,7 +452,7 @@ export function PlantBrowser({
                 <button
                   type="button"
                   onClick={handleResetFilters}
-                  className="text-[11px] font-semibold text-primary transition-colors hover:text-primary-light"
+                  className="cursor-pointer text-[11px] font-semibold text-primary transition-colors hover:text-primary-light"
                 >
                   Clear all
                 </button>
@@ -465,7 +480,7 @@ export function PlantBrowser({
                       handleResetFilters();
                       setActiveCategory("all");
                     }}
-                    className="mt-2 text-sm text-primary transition-colors hover:text-primary-light"
+                    className="mt-2 cursor-pointer text-sm text-primary transition-colors hover:text-primary-light"
                   >
                     Clear all filters
                   </button>
@@ -559,15 +574,15 @@ export function PlantBrowser({
           type="button"
           onClick={onClose}
           disabled={selectedItems.length === 0}
-          className="flex h-[30px] items-center justify-center rounded-md bg-primary px-3.5 text-[12px] font-semibold text-white transition-colors hover:bg-primary-light disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex h-[30px] cursor-pointer items-center justify-center rounded-md bg-primary px-3.5 text-[12px] font-semibold text-white transition-colors hover:bg-primary-light disabled:cursor-not-allowed disabled:opacity-50"
         >
           Add to Canvas
         </button>
       </div>
       )}
 
-      {/* Resize handle */}
-      {!maximized && (
+      {/* Resize handle — desktop only */}
+      {!isMobile && !maximized && (
         <button
           type="button"
           aria-label="Resize panel"
@@ -595,7 +610,7 @@ function ActiveChip({
       <button
         type="button"
         onClick={onRemove}
-        className="flex h-3 w-3 items-center justify-center rounded-full text-foreground/60 transition-colors hover:text-foreground"
+        className="flex h-3 w-3 cursor-pointer items-center justify-center rounded-full text-foreground/60 transition-colors hover:text-foreground"
         aria-label={`Remove ${label}`}
       >
         <CloseIcon className="h-2.5 w-2.5" />

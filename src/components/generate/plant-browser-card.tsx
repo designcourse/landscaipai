@@ -65,7 +65,7 @@ export function PlantBrowserCard({
       <button
         type="button"
         onClick={onViewDetail}
-        className="flex flex-1 flex-col text-left"
+        className="flex flex-1 cursor-pointer flex-col text-left"
       >
         {/* Image */}
         <div className="h-[112px] w-full shrink-0 overflow-hidden bg-muted">
@@ -124,7 +124,7 @@ export function PlantBrowserCard({
           e.stopPropagation();
           onToggle();
         }}
-        className={`absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full text-sm shadow-sm transition-all ${
+        className={`absolute right-2 top-2 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full text-sm shadow-sm transition-all ${
           selected
             ? "bg-primary text-white"
             : "border border-panel-border-strong bg-white text-foreground/70 opacity-0 hover:text-primary group-hover:opacity-100"

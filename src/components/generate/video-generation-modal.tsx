@@ -1,9 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  CAMERA_PRESETS,
-  TRANSITION_PRESETS,
   VIDEO_MODELS,
   RESOLUTION_OPTIONS,
   DEFAULT_CAMERA_PRESET_ID,
@@ -13,6 +11,14 @@ import {
   computeCreditCost,
   type ResolutionOption,
 } from "@/lib/gemini/video-prompts";
+import { useFloatingPanel } from "@/hooks/use-floating-panel";
+import { useIsMobile } from "@/hooks/use-is-mobile";
+import {
+  CloseIcon,
+  MaximizeIcon,
+  GripIcon,
+  ResizeHandleIcon,
+} from "./plant-browser-icons";
 
 export interface VideoGenerationSubmit {
   modelId: string;
@@ -20,8 +26,6 @@ export interface VideoGenerationSubmit {
   transitionPresetId: string;
   resolution: ResolutionOption;
   customPrompt: string;
-  // True when the user clicked the swap button — start and end frames should
-  // be flipped relative to the original selection order before submitting.
   swapped: boolean;
 }
 
@@ -41,7 +45,16 @@ interface VideoGenerationModalProps {
   onSubmit: (values: VideoGenerationSubmit) => void;
 }
 
+// Locked at 8s — first/last frame interpolation requirement (Veo 3.1).
 const DURATION_SECONDS = 8;
+
+// Floating-panel sizing (matches Plant Library conventions)
+const TOP_GUTTER = 72;
+const BOTTOM_GUTTER = 110;
+const DEFAULT_WIDTH = 760;
+const DEFAULT_HEIGHT = 540;
+const MIN_WIDTH = 560;
+const MIN_HEIGHT = 460;
 
 export function VideoGenerationModal({
   startFrame,
@@ -53,282 +66,393 @@ export function VideoGenerationModal({
   onSubmit,
 }: VideoGenerationModalProps) {
   const [modelId, setModelId] = useState<string>(DEFAULT_VIDEO_MODEL_ID);
-  const [cameraPresetId, setCameraPresetId] = useState<string>(DEFAULT_CAMERA_PRESET_ID);
-  const [transitionPresetId, setTransitionPresetId] = useState<string>(
-    DEFAULT_TRANSITION_PRESET_ID
-  );
   const [resolution, setResolution] = useState<ResolutionOption>(DEFAULT_RESOLUTION);
   const [customPrompt, setCustomPrompt] = useState("");
-  // Local swap toggle — does not affect the parent's selection order, only
-  // determines which frame is shown as Start vs End and how submit is sent.
   const [swapped, setSwapped] = useState(false);
+
+  // Pill dropdown state
+  const [openPill, setOpenPill] = useState<"model" | "res" | null>(null);
+  const modelPillRef = useRef<HTMLDivElement>(null);
+  const resPillRef = useRef<HTMLDivElement>(null);
+
+  // On phones, the panel becomes a fullscreen takeover — drag/resize/maximize
+  // make no sense at that size. Close button is the only way out.
+  const isMobile = useIsMobile();
+
+  // Floating panel bounds (drag/resize/maximize) — same hook as Plant Library.
+  const { bounds, maximized, dragHandlers, resizeHandlers, toggleMaximize } =
+    useFloatingPanel({
+      storageKey: "video-generation-bounds-v1",
+      initial: (() => {
+        if (typeof window === "undefined") {
+          return { x: 200, y: TOP_GUTTER + 24, width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT };
+        }
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        const width = Math.min(DEFAULT_WIDTH, vw - 32);
+        const height = Math.min(DEFAULT_HEIGHT, vh - TOP_GUTTER - BOTTOM_GUTTER);
+        return {
+          x: Math.max(16, Math.round((vw - width) / 2)),
+          y: Math.max(
+            TOP_GUTTER,
+            Math.round((vh - height - BOTTOM_GUTTER) / 2) + TOP_GUTTER / 2,
+          ),
+          width,
+          height,
+        };
+      })(),
+      minWidth: MIN_WIDTH,
+      minHeight: MIN_HEIGHT,
+      topGutter: TOP_GUTTER,
+      bottomGutter: BOTTOM_GUTTER,
+    });
 
   const cost = useMemo(
     () => computeCreditCost({ modelId, durationSeconds: DURATION_SECONDS, resolution }),
-    [modelId, resolution]
+    [modelId, resolution],
   );
-
   const insufficient = credits < cost;
+  const selectedModel = VIDEO_MODELS.find((m) => m.id === modelId);
+  const selectedRes = RESOLUTION_OPTIONS.find((r) => r.id === resolution);
+
+  const displayStart = swapped ? endFrame : startFrame;
+  const displayEnd = swapped ? startFrame : endFrame;
 
   function handleSubmit() {
     if (submitting || insufficient) return;
     onSubmit({
       modelId,
-      cameraPresetId,
-      transitionPresetId,
+      // Camera + transition are intentionally hidden from the UI for now —
+      // we ship baseline defaults until those presets are validated.
+      cameraPresetId: DEFAULT_CAMERA_PRESET_ID,
+      transitionPresetId: DEFAULT_TRANSITION_PRESET_ID,
       resolution,
       customPrompt,
       swapped,
     });
   }
 
-  // Display order — flip when the user has clicked swap
-  const displayStart = swapped ? endFrame : startFrame;
-  const displayEnd = swapped ? startFrame : endFrame;
+  // Close on Escape (same as Plant Library)
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape" && !submitting) {
+        if (openPill) {
+          setOpenPill(null);
+        } else {
+          onClose();
+        }
+      }
+    }
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [onClose, submitting, openPill]);
+
+  // Click outside any open pill closes the popover.
+  useEffect(() => {
+    if (!openPill) return;
+    function handleClick(e: MouseEvent) {
+      const t = e.target as Node;
+      const inModel = modelPillRef.current?.contains(t);
+      const inRes = resPillRef.current?.contains(t);
+      if (!inModel && !inRes) setOpenPill(null);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [openPill]);
+
+  // Submit on Cmd/Ctrl+Enter inside textarea
+  function handlePromptKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+      e.preventDefault();
+      handleSubmit();
+    }
+  }
+
+  // On mobile, override panel chrome to fullscreen takeover.
+  const panelStyle: React.CSSProperties = isMobile
+    ? { left: 0, top: 0, width: "100vw", height: "100dvh", boxShadow: "none" }
+    : {
+        left: bounds.x,
+        top: bounds.y,
+        width: bounds.width,
+        height: bounds.height,
+        boxShadow: "var(--shadow-toolbar)",
+      };
 
   return (
     <div
-      className="fixed inset-0 z-[250] flex items-center justify-center p-4"
-      style={{ backgroundColor: "rgba(0, 0, 0, 0.5)" }}
-      onClick={() => !submitting && onClose()}
+      role="dialog"
+      aria-label="Generate Video"
+      className={`fixed z-40 flex flex-col overflow-hidden bg-panel-main ${
+        isMobile ? "" : "rounded-lg border border-panel-border"
+      }`}
+      style={panelStyle}
     >
+      {/* Title bar — draggable on desktop, static on mobile */}
       <div
-        className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-lg"
-        style={{
-          backgroundColor: "var(--color-background)",
-          border: "1px solid var(--color-border)",
-          boxShadow: "var(--shadow-toolbar)",
-        }}
-        onClick={(e) => e.stopPropagation()}
+        className="flex h-[52px] shrink-0 select-none items-center gap-2.5 border-b border-panel-border bg-panel pl-4 pr-2.5"
+        style={{ cursor: isMobile || maximized ? "default" : "grab" }}
+        {...(isMobile ? {} : dragHandlers)}
       >
-        {/* Header */}
-        <div
-          className="flex items-center justify-between px-6 py-4"
-          style={{ borderBottom: "1px solid var(--color-border)" }}
-        >
-          <div className="flex items-center gap-3">
-            <div
-              className="flex h-10 w-10 items-center justify-center rounded-full"
-              style={{ backgroundColor: "var(--color-primary)" }}
-            >
-              <svg
-                className="h-5 w-5 text-white"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-                />
-              </svg>
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-foreground">
-                Generate Video
-              </h3>
-              <p className="text-xs text-muted-foreground">
-                Interpolate between your two selected images
-              </p>
-            </div>
-          </div>
+        {!isMobile && (
+          <span className="text-muted-foreground/60" aria-hidden>
+            <GripIcon className="h-3.5 w-3.5" />
+          </span>
+        )}
+        <h2 className="text-[13px] font-semibold text-foreground">
+          Generate Video
+        </h2>
+
+        <div className="flex flex-1" />
+
+        {!isMobile && (
           <button
-            onClick={() => !submitting && onClose()}
-            disabled={submitting}
-            className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleMaximize();
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="flex h-[30px] w-[30px] cursor-pointer items-center justify-center rounded-md text-foreground/70 transition-colors hover:bg-panel-subtle hover:text-foreground"
+            title={maximized ? "Restore" : "Maximize"}
+            aria-label={maximized ? "Restore" : "Maximize"}
           >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <MaximizeIcon />
           </button>
+        )}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!submitting) onClose();
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+          disabled={submitting}
+          className="flex h-[30px] w-[30px] cursor-pointer items-center justify-center rounded-md text-foreground/70 transition-colors hover:bg-panel-subtle hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+          title="Close"
+          aria-label="Close"
+        >
+          <CloseIcon />
+        </button>
+      </div>
+
+      {/* Body */}
+      <div className="scrollbar-minimal flex min-h-0 flex-1 flex-col gap-[18px] overflow-y-auto bg-panel-main px-4 py-5 sm:px-6">
+        {/* Hero frames — stack vertically on phones, side-by-side on ≥sm */}
+        <div className="relative flex flex-col items-center justify-center gap-3.5 sm:flex-row">
+          <FrameTile label="START" frame={displayStart} accent="primary" />
+          <button
+            type="button"
+            onClick={() => setSwapped((s) => !s)}
+            title="Swap start and end frames"
+            aria-label="Swap start and end frames"
+            className="z-10 flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-panel-border bg-white shadow-md transition-shadow hover:shadow-lg"
+          >
+            <SwapIcon />
+          </button>
+          <FrameTile label="END" frame={displayEnd} accent="warning" />
         </div>
 
-        <div className="space-y-6 px-6 py-5">
-          {/* Frame previews with swap control */}
-          <div className="relative grid grid-cols-2 gap-4">
-            <FrameCard label="Start Frame" frame={displayStart} />
-            <FrameCard label="End Frame" frame={displayEnd} />
+        {/* Chat input card */}
+        <div className="flex flex-col gap-4 rounded-[14px] border border-panel-border bg-white p-4">
+          <textarea
+            value={customPrompt}
+            onChange={(e) => setCustomPrompt(e.target.value)}
+            onKeyDown={handlePromptKeyDown}
+            placeholder='Describe the transition between your two frames…&#10;e.g. "morph naturally over 8 seconds, emphasize water reflections, slight golden-hour shift"'
+            rows={3}
+            className="min-h-[88px] w-full resize-none bg-transparent text-[15px] leading-snug text-foreground placeholder:text-[#acacac] focus:outline-none"
+          />
 
-            {/* Swap button — sits in the gap between the two frames */}
+          {/* Pill row */}
+          <div className="flex h-9 items-center gap-2">
+            {/* MODEL pill */}
+            <div className="relative" ref={modelPillRef}>
+              <button
+                type="button"
+                onClick={() => setOpenPill((p) => (p === "model" ? null : "model"))}
+                className="flex h-8 cursor-pointer items-center gap-1.5 rounded-full border border-primary bg-primary-tint/50 px-3 transition-colors hover:bg-primary-tint"
+                style={{ backgroundColor: "rgba(216, 230, 211, 0.45)" }}
+              >
+                <span className="text-[10px] font-medium uppercase tracking-wider text-panel-muted">
+                  Model
+                </span>
+                <span className="text-[12px] font-semibold text-primary-dark">
+                  {selectedModel?.name}
+                </span>
+                <span className="text-[9px] text-panel-muted">▾</span>
+              </button>
+              {openPill === "model" && (
+                <div className="absolute bottom-full left-0 z-20 mb-2 w-64 overflow-hidden rounded-lg border border-panel-border bg-white shadow-lg">
+                  {VIDEO_MODELS.map((m) => {
+                    const mCost = computeCreditCost({
+                      modelId: m.id,
+                      durationSeconds: DURATION_SECONDS,
+                      resolution,
+                    });
+                    const sel = m.id === modelId;
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => {
+                          setModelId(m.id);
+                          setOpenPill(null);
+                        }}
+                        className={`flex w-full cursor-pointer flex-col items-start gap-0.5 px-3.5 py-2.5 text-left transition-colors hover:bg-panel-subtle ${
+                          sel ? "bg-panel-subtle" : ""
+                        }`}
+                      >
+                        <div className="flex w-full items-center gap-2">
+                          <span className="text-[13px] font-semibold text-foreground">
+                            {m.name}
+                          </span>
+                          <span className="ml-auto rounded-full bg-panel-chip px-1.5 py-px text-[10px] font-bold uppercase text-panel-muted">
+                            {mCost} cr
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-muted-foreground">
+                          {m.description}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* RES pill */}
+            <div className="relative" ref={resPillRef}>
+              <button
+                type="button"
+                onClick={() => setOpenPill((p) => (p === "res" ? null : "res"))}
+                className="flex h-8 cursor-pointer items-center gap-1.5 rounded-full border border-panel-border bg-panel-subtle px-3 transition-colors hover:bg-panel-chip"
+              >
+                <span className="text-[10px] font-medium uppercase tracking-wider text-panel-muted">
+                  Res
+                </span>
+                <span className="text-[12px] font-semibold text-foreground">
+                  {selectedRes?.label}
+                </span>
+                <span className="text-[9px] text-panel-muted">▾</span>
+              </button>
+              {openPill === "res" && (
+                <div className="absolute bottom-full left-0 z-20 mb-2 w-44 overflow-hidden rounded-lg border border-panel-border bg-white shadow-lg">
+                  {RESOLUTION_OPTIONS.map((r) => {
+                    const sel = r.id === resolution;
+                    return (
+                      <button
+                        key={r.id}
+                        type="button"
+                        onClick={() => {
+                          setResolution(r.id);
+                          setOpenPill(null);
+                        }}
+                        className={`flex w-full cursor-pointer flex-col items-start gap-0.5 px-3.5 py-2 text-left transition-colors hover:bg-panel-subtle ${
+                          sel ? "bg-panel-subtle" : ""
+                        }`}
+                      >
+                        <span className="text-[13px] font-semibold text-foreground">
+                          {r.label}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground">
+                          {r.description}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Duration locked chip */}
+            <div
+              className="flex h-8 items-center gap-1.5 rounded-full border border-panel-border px-3"
+              style={{ backgroundColor: "var(--color-panel-search)" }}
+              title="Duration is fixed at 8s for first/last frame interpolation"
+            >
+              <span className="text-[10px]" aria-hidden>
+                🔒
+              </span>
+              <span className="text-[12px] font-semibold text-foreground">8s</span>
+            </div>
+
+            <div className="flex-1" />
+
+            {/* Inline send button (chat-style shortcut) */}
             <button
               type="button"
-              onClick={() => setSwapped((prev) => !prev)}
-              title="Swap start and end frames"
-              aria-label="Swap start and end frames"
-              className="absolute left-1/2 top-1/2 z-10 flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow-lg ring-1 ring-border transition-shadow hover:shadow-xl"
-            >
-              <svg
-                className="h-5 w-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="#1a1a1a"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
-                />
-              </svg>
-            </button>
-          </div>
-
-          {/* Model */}
-          <Section title="Model">
-            <div className="grid grid-cols-2 gap-2">
-              {VIDEO_MODELS.map((m) => {
-                const modelCost = computeCreditCost({
-                  modelId: m.id,
-                  durationSeconds: DURATION_SECONDS,
-                  resolution,
-                });
-                return (
-                  <OptionCard
-                    key={m.id}
-                    selected={modelId === m.id}
-                    title={m.name}
-                    description={m.description}
-                    badge={`${modelCost} cr`}
-                    onClick={() => setModelId(m.id)}
-                  />
-                );
-              })}
-            </div>
-          </Section>
-
-          {/* Camera Movement */}
-          <Section title="Camera Movement">
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {CAMERA_PRESETS.map((p) => (
-                <OptionCard
-                  key={p.id}
-                  selected={cameraPresetId === p.id}
-                  title={p.name}
-                  description={p.description}
-                  compact
-                  onClick={() => setCameraPresetId(p.id)}
-                />
-              ))}
-            </div>
-            <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
-              Camera movement works best when your start and end frames are taken from
-              slightly different vantage points. If both frames are framed identically,
-              the movement may be subtle or barely visible — use Stationary in that case.
-            </p>
-          </Section>
-
-          {/* Transition */}
-          <Section title="Transition Style">
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {TRANSITION_PRESETS.map((p) => (
-                <OptionCard
-                  key={p.id}
-                  selected={transitionPresetId === p.id}
-                  title={p.name}
-                  description={p.description}
-                  badge={p.experimental ? "EXPERIMENTAL" : undefined}
-                  compact
-                  onClick={() => setTransitionPresetId(p.id)}
-                />
-              ))}
-            </div>
-          </Section>
-
-          {/* Resolution + audio */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Section title="Resolution">
-              <div className="grid grid-cols-2 gap-2">
-                {RESOLUTION_OPTIONS.map((r) => (
-                  <OptionCard
-                    key={r.id}
-                    selected={resolution === r.id}
-                    title={r.label}
-                    description={r.description}
-                    compact
-                    onClick={() => setResolution(r.id)}
-                  />
-                ))}
-              </div>
-            </Section>
-
-            <Section title="Duration">
-              <div
-                className="flex h-full items-center justify-center rounded-md border px-4 py-3 text-sm text-foreground"
-                style={{
-                  borderColor: "var(--color-border)",
-                  backgroundColor: "var(--color-muted)",
-                }}
-              >
-                <span className="font-medium">8 seconds</span>
-                <span className="ml-2 text-xs text-muted-foreground">
-                  (required for first/last frame)
-                </span>
-              </div>
-            </Section>
-          </div>
-
-          {/* Custom direction */}
-          <Section title="Additional Direction (optional)">
-            <textarea
-              value={customPrompt}
-              onChange={(e) => setCustomPrompt(e.target.value)}
-              placeholder="e.g. emphasize water reflections, keep sky dramatic, birds flying..."
-              rows={2}
-              className="w-full resize-none rounded-md border px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
-              style={{
-                borderColor: "var(--color-border)",
-                backgroundColor: "var(--color-background)",
-              }}
-            />
-          </Section>
-
-          {/* Error */}
-          {error && (
-            <div className="rounded-md bg-destructive/10 px-4 py-2 text-sm text-destructive">
-              {error}
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div
-          className="flex items-center justify-between gap-3 px-6 py-4"
-          style={{ borderTop: "1px solid var(--color-border)" }}
-        >
-          <div className="text-sm text-muted-foreground">
-            Cost: <span className="font-semibold text-foreground">{cost} credits</span>
-            {" · "}
-            You have <span className="font-semibold text-foreground">{credits}</span>
-          </div>
-          <div className="flex gap-3">
-            <button
-              onClick={() => !submitting && onClose()}
-              disabled={submitting}
-              className="rounded-md px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
-              style={{
-                color: "var(--color-foreground)",
-                backgroundColor: "var(--color-muted)",
-                border: "1px solid var(--color-border)",
-              }}
-            >
-              Cancel
-            </button>
-            <button
               onClick={handleSubmit}
               disabled={submitting || insufficient}
-              className="rounded-md bg-primary px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-light disabled:opacity-50"
+              title={
+                insufficient
+                  ? `Need ${cost - credits} more credits`
+                  : `Generate video (${cost} credits)`
+              }
+              aria-label="Generate video"
+              className="flex h-8 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-primary text-white transition-colors hover:bg-primary-light disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {submitting
-                ? "Starting..."
-                : insufficient
-                  ? "Insufficient credits"
-                  : `Generate Video (${cost} credits)`}
+              <SendIcon />
             </button>
           </div>
         </div>
+
+        {/* Error inline */}
+        {error && (
+          <div className="rounded-md bg-destructive/10 px-3.5 py-2 text-[13px] text-destructive">
+            {error}
+          </div>
+        )}
       </div>
+
+      {/* Footer */}
+      <div
+        className="flex h-[54px] shrink-0 items-center gap-2.5 border-t border-panel-border bg-panel-subtle px-4"
+      >
+        <div className="flex min-w-0 items-center gap-1.5 text-[12px]">
+          <span className="font-medium text-panel-muted">Cost</span>
+          <span className="font-semibold text-foreground">{cost} credits</span>
+          <span className="hidden text-panel-muted sm:inline">·</span>
+          <span className="hidden font-medium text-panel-muted sm:inline">
+            {credits} credits available
+          </span>
+        </div>
+        <div className="flex-1" />
+        <button
+          type="button"
+          onClick={() => !submitting && onClose()}
+          disabled={submitting}
+          className="flex h-[30px] cursor-pointer items-center justify-center rounded-md border border-panel-border bg-white px-3.5 text-[12px] font-semibold text-foreground/70 transition-colors hover:bg-panel-subtle disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={submitting || insufficient}
+          className="flex h-[30px] cursor-pointer items-center gap-1.5 rounded-md bg-primary px-4 text-[12px] font-semibold text-white transition-colors hover:bg-primary-light disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <PlayIcon />
+          {submitting
+            ? "Starting…"
+            : insufficient
+              ? "Insufficient credits"
+              : `Generate Video (${cost} credits)`}
+        </button>
+      </div>
+
+      {/* Resize handle — desktop only */}
+      {!isMobile && !maximized && (
+        <button
+          type="button"
+          aria-label="Resize panel"
+          className="absolute bottom-0 right-0 flex h-4 w-4 items-end justify-end p-0.5 text-muted-foreground/60 hover:text-foreground"
+          style={{ cursor: "nwse-resize", background: "transparent" }}
+          {...resizeHandlers}
+        >
+          <ResizeHandleIcon />
+        </button>
+      )}
     </div>
   );
 }
@@ -336,81 +460,81 @@ export function VideoGenerationModal({
 // ----------------------------------------------------------------------------
 // Subcomponents
 // ----------------------------------------------------------------------------
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-        {title}
-      </p>
-      {children}
-    </div>
-  );
-}
-
-function FrameCard({ label, frame }: { label: string; frame: FramePreview }) {
-  return (
-    <div>
-      <p className="mb-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-        {label}
-      </p>
-      <div
-        className="relative overflow-hidden rounded-md"
-        style={{ aspectRatio: `${frame.width} / ${frame.height}` }}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={frame.url}
-          alt={label}
-          className="h-full w-full object-cover"
-          draggable={false}
-        />
-      </div>
-    </div>
-  );
-}
-
-function OptionCard({
-  selected,
-  title,
-  description,
-  badge,
-  compact,
-  onClick,
+function FrameTile({
+  label,
+  frame,
+  accent,
 }: {
-  selected: boolean;
-  title: string;
-  description: string;
-  badge?: string;
-  compact?: boolean;
-  onClick: () => void;
+  label: string;
+  frame: FramePreview;
+  accent: "primary" | "warning";
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-md border text-left transition-all ${
-        compact ? "px-3 py-2" : "px-3.5 py-3"
-      } ${
-        selected
-          ? "border-primary bg-primary/5 ring-1 ring-primary"
-          : "border-border bg-background hover:border-foreground/20"
-      }`}
+    <div className="relative min-w-0 flex-1 overflow-hidden rounded-lg">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={frame.url}
+        alt={label}
+        draggable={false}
+        className="block h-auto w-full select-none object-cover"
+        style={{ aspectRatio: `${frame.width} / ${frame.height}` }}
+      />
+      {/* Corner badge */}
+      <span className="absolute left-2 top-2 inline-flex items-center gap-1.5 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">
+        <span
+          className={`h-[5px] w-[5px] rounded-full ${
+            accent === "primary" ? "bg-primary" : "bg-warning"
+          }`}
+        />
+        {label}
+      </span>
+    </div>
+  );
+}
+
+function SwapIcon() {
+  return (
+    <svg
+      className="h-4 w-4"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="#171717"
+      strokeWidth={2}
     >
-      <div className="flex items-start justify-between gap-2">
-        <span className={`font-semibold text-foreground ${compact ? "text-sm" : "text-sm"}`}>
-          {title}
-        </span>
-        {badge && (
-          <span
-            className="flex-shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
-          >
-            {badge}
-          </span>
-        )}
-      </div>
-      <p className={`mt-0.5 text-muted-foreground ${compact ? "text-xs" : "text-xs"}`}>
-        {description}
-      </p>
-    </button>
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
+      />
+    </svg>
+  );
+}
+
+function SendIcon() {
+  return (
+    <svg
+      className="h-3.5 w-3.5"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 19V5" />
+      <path d="M5 12l7-7 7 7" />
+    </svg>
+  );
+}
+
+function PlayIcon() {
+  return (
+    <svg
+      className="h-3 w-3"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+    >
+      <path d="M6 4l14 8-14 8V4z" />
+    </svg>
   );
 }

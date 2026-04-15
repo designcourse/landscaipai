@@ -113,7 +113,7 @@ export function CategoryRail({ active, onChange, counts }: CategoryRailProps) {
             key={cat.id}
             type="button"
             onClick={() => onChange(cat.id)}
-            className={`group flex flex-col items-center justify-center gap-1 rounded-md px-1 py-2 transition-colors ${
+            className={`group flex cursor-pointer flex-col items-center justify-center gap-1 rounded-md px-1 py-2 transition-colors ${
               isActive
                 ? "bg-primary-tint"
                 : "hover:bg-panel-border"
@@ -187,7 +187,7 @@ function FilterCheckbox({
     <button
       type="button"
       onClick={onChange}
-      className="flex w-full items-center gap-2 py-0.5 text-left"
+      className="flex w-full cursor-pointer items-center gap-2 py-0.5 text-left"
     >
       <span
         className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border transition-colors ${
@@ -235,7 +235,7 @@ export function FilterDrawer({
           <button
             type="button"
             onClick={onReset}
-            className="text-[11px] font-semibold text-primary transition-colors hover:text-primary-light"
+            className="cursor-pointer text-[11px] font-semibold text-primary transition-colors hover:text-primary-light"
           >
             Reset
           </button>
@@ -247,7 +247,7 @@ export function FilterDrawer({
         <button
           type="button"
           onClick={onZoneFilterToggle}
-          className={`flex items-center gap-2 rounded-md px-2.5 py-2 text-left transition-colors ${
+          className={`flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-left transition-colors ${
             zoneFilterEnabled ? "bg-primary-tint" : "bg-panel-border"
           }`}
         >

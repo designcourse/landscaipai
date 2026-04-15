@@ -243,7 +243,7 @@ export function PlantBrowserDetail({
         <button
           type="button"
           onClick={onBack}
-          className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-panel-subtle hover:text-foreground"
+          className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-panel-subtle hover:text-foreground"
           aria-label="Back"
         >
           <BackIcon />
@@ -284,7 +284,7 @@ export function PlantBrowserDetail({
         <button
           type="button"
           onClick={onToggle}
-          className={`rounded-md text-sm font-semibold transition-colors ${
+          className={`cursor-pointer rounded-md text-sm font-semibold transition-colors ${
             wide ? "px-4 py-2" : "w-full py-2.5"
           } ${
             selected
