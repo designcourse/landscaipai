@@ -248,7 +248,7 @@ export function GenerationWorkspace({
       <div className="flex items-center justify-between">
         <div>
           <Link
-            href={`/project/${projectId}`}
+            href="/dashboard"
             className="text-sm text-muted-foreground transition-colors hover:text-foreground"
           >
             &larr; {projectName}

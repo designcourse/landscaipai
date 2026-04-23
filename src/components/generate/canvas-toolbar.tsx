@@ -90,7 +90,7 @@ export function CanvasToolbar({
       {/* Left: Back + Logo */}
       <div className="flex items-center gap-3 overflow-hidden">
         <Link
-          href={`/project/${projectId}`}
+          href="/dashboard"
           className="whitespace-nowrap text-base font-medium text-foreground transition-colors hover:text-primary"
         >
           &larr; Back
