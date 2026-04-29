@@ -18,12 +18,10 @@ export default async function AccountPage() {
     await getCompanySettings();
 
   return (
-    <main className="px-element py-section">
-      <AccountSettings
-        user={user}
-        companySettings={companySettings}
-        initialLogoUrl={initialLogoUrl}
-      />
-    </main>
+    <AccountSettings
+      user={user}
+      companySettings={companySettings}
+      initialLogoUrl={initialLogoUrl}
+    />
   );
 }

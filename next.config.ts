@@ -20,6 +20,9 @@ const nextConfig: NextConfig = {
     "@remotion/renderer",
     "@remotion/media-parser",
     "remotion",
+    // PDFKit ships .afm font metric files it loads via fs at runtime —
+    // bundling them through webpack breaks. Keep as a node_module require.
+    "pdfkit",
   ],
 };
 

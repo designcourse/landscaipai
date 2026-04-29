@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { createClient } from "./server";
 import { BUCKET_COMPANY_LOGOS } from "@/lib/utils/storage";
-import type { CompanySettings, Profile } from "@/types";
+import type { CompanySettings, CreditTransaction, Profile } from "@/types";
 
 /**
  * Cached per-request: fetches the authenticated user and their profile.
@@ -66,4 +66,27 @@ export const getCompanySettings = cache(async (): Promise<{
   }
 
   return { settings: data as CompanySettings, logoUrl };
+});
+
+/**
+ * Cached per-request: fetches the authenticated user's billing history —
+ * one-time credit pack purchases, newest first. Subscriptions are not yet
+ * fulfilled, so they're filtered out.
+ */
+export const getBillingHistory = cache(async (): Promise<CreditTransaction[]> => {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data } = await supabase
+    .from("credit_transactions")
+    .select("*")
+    .eq("user_id", user.id)
+    .eq("type", "purchase")
+    .order("created_at", { ascending: false });
+
+  return (data ?? []) as CreditTransaction[];
 });
