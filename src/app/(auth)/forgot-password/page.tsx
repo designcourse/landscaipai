@@ -5,7 +5,7 @@ export const metadata = { title: "Forgot Password" };
 
 export default function ForgotPasswordPage() {
   return (
-    <main className="flex min-h-screen items-center justify-center px-element">
+    <main className="flex min-h-[calc(100vh-64px)] items-center justify-center px-element py-section">
       <Suspense>
         <ForgotPasswordForm />
       </Suspense>

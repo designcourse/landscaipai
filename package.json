@@ -19,13 +19,16 @@
     "@remotion/transitions": "^4.0.447",
     "@supabase/ssr": "^0.9.0",
     "@supabase/supabase-js": "^2.98.0",
+    "lenis": "^1.3.23",
     "next": "16.1.6",
+    "openai": "^6.34.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "recharts": "^3.7.0",
     "remotion": "^4.0.447",
     "sharp": "^0.34.5",
-    "stripe": "^20.4.0"
+    "stripe": "^20.4.0",
+    "three": "^0.160.1"
   },
   "devDependencies": {
     "@remotion/bundler": "^4.0.447",
@@ -35,6 +38,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/sharp": "^0.31.1",
+    "@types/three": "^0.184.0",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
