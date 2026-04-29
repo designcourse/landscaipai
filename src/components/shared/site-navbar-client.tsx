@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
+import { useAuthModal } from "./auth-modal-context";
 import type { Profile } from "@/types";
 
 type NavbarProfile = Pick<
@@ -25,9 +26,17 @@ const NAV_LINKS = [
 ];
 
 function Avatar({ url, initials }: { url: string | null; initials: string }) {
-  if (url) {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={url} alt="" className="h-8 w-8 rounded-full object-cover" />;
+  const [failed, setFailed] = useState(false);
+  if (url && !failed) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={url}
+        alt=""
+        className="h-8 w-8 rounded-full object-cover"
+        onError={() => setFailed(true)}
+      />
+    );
   }
   return (
     <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-medium text-white">
@@ -38,6 +47,7 @@ function Avatar({ url, initials }: { url: string | null; initials: string }) {
 
 export function SiteNavbarClient({ user, profile }: SiteNavbarClientProps) {
   const router = useRouter();
+  const { openModal } = useAuthModal();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -153,12 +163,20 @@ export function SiteNavbarClient({ user, profile }: SiteNavbarClientProps) {
           </>
         ) : (
           <>
-            <Link href="/login" className="btn btn-ghost btn-sm">
+            <button
+              type="button"
+              onClick={() => openModal("login")}
+              className="btn btn-ghost btn-sm"
+            >
               Sign in
-            </Link>
-            <Link href="/signup" className="btn btn-primary btn-sm">
+            </button>
+            <button
+              type="button"
+              onClick={() => openModal("signup")}
+              className="btn btn-primary btn-sm"
+            >
               Get started
-            </Link>
+            </button>
           </>
         )}
       </div>
@@ -234,16 +252,25 @@ export function SiteNavbarClient({ user, profile }: SiteNavbarClientProps) {
               </>
             ) : (
               <>
-                <Link href="/login" onClick={closeMobile}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    closeMobile();
+                    openModal("login");
+                  }}
+                >
                   Sign in
-                </Link>
-                <Link
-                  href="/signup"
+                </button>
+                <button
+                  type="button"
                   className="primary"
-                  onClick={closeMobile}
+                  onClick={() => {
+                    closeMobile();
+                    openModal("signup");
+                  }}
                 >
                   Get started
-                </Link>
+                </button>
               </>
             )}
           </div>

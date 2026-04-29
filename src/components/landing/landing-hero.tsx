@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import { useAuthModal } from "@/components/shared/auth-modal-context";
 
 type PresetKey = "cottage" | "modern" | "zen" | "xeriscape";
 
@@ -37,6 +37,7 @@ const PRESETS: Record<PresetKey, Preset> = {
 const PRESET_ORDER: PresetKey[] = ["cottage", "modern", "zen", "xeriscape"];
 
 export function LandingHero() {
+  const { openModal } = useAuthModal();
   const [preset, setPreset] = useState<PresetKey>("cottage");
   const sliderRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef(false);
@@ -222,9 +223,13 @@ export function LandingHero() {
             is.
           </p>
           <div className="vA-ctas">
-            <Link href="/signup" className="btn btn-primary btn-lg">
+            <button
+              type="button"
+              onClick={() => openModal("signup")}
+              className="btn btn-primary btn-lg"
+            >
               Start free — 3 credits
-            </Link>
+            </button>
             <button type="button" className="btn btn-outline btn-lg">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M8 5v14l11-7z" />

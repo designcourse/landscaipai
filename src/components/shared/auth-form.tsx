@@ -6,13 +6,30 @@ import { createClient } from "@/lib/supabase/client";
 
 type AuthMode = "login" | "signup";
 
-export function AuthForm({ mode }: { mode: AuthMode }) {
+interface AuthFormProps {
+  mode: AuthMode;
+  variant?: "page" | "modal";
+  onSwitchMode?: () => void;
+  onSuccess?: () => void;
+}
+
+export function AuthForm({
+  mode,
+  variant = "page",
+  onSwitchMode,
+  onSuccess,
+}: AuthFormProps) {
+  const isModal = variant === "modal";
+  const googleBg = isModal ? "bg-white" : "bg-background";
+  const inputBg = isModal ? "bg-white" : "bg-background";
+  const inputAutofill = isModal ? " no-autofill-tint" : "";
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const isLogin = mode === "login";
@@ -20,6 +37,7 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setInfo(null);
     setLoading(true);
 
     if (isLogin) {
@@ -33,7 +51,7 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
         return;
       }
     } else {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -45,8 +63,19 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
         setLoading(false);
         return;
       }
+      if (data.user && data.user.identities && data.user.identities.length === 0) {
+        setError("An account with this email already exists. Try signing in instead.");
+        setLoading(false);
+        return;
+      }
+      if (!data.session) {
+        setInfo("Account created — check your email for a confirmation link to finish signing in.");
+        setLoading(false);
+        return;
+      }
     }
 
+    onSuccess?.();
     router.push("/dashboard");
     router.refresh();
   }
@@ -82,7 +111,7 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
       <button
         type="button"
         onClick={handleGoogleAuth}
-        className="flex w-full items-center justify-center gap-tight rounded-sm border border-border bg-background px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+        className={`flex w-full cursor-pointer items-center justify-center gap-tight rounded-sm border border-border ${googleBg} px-4 py-2.5 text-sm font-medium text-foreground`}
       >
         <svg className="h-5 w-5" viewBox="0 0 24 24">
           <path
@@ -130,7 +159,7 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
               type="text"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              className="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className={`mt-1 block w-full rounded-md border border-border ${inputBg} px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary${inputAutofill}`}
               placeholder="Jane Smith"
             />
           </div>
@@ -149,7 +178,7 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className={`mt-1 block w-full rounded-md border border-border ${inputBg} px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary${inputAutofill}`}
             placeholder="you@example.com"
           />
         </div>
@@ -168,7 +197,7 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
             minLength={6}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className={`mt-1 block w-full rounded-md border border-border ${inputBg} px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary${inputAutofill}`}
             placeholder="At least 6 characters"
           />
         </div>
@@ -188,6 +217,10 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
           <p className="text-sm text-destructive">{error}</p>
         )}
 
+        {info && (
+          <p className="text-sm text-success">{info}</p>
+        )}
+
         <button
           type="submit"
           disabled={loading}
@@ -205,12 +238,22 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
 
       <p className="text-center text-sm text-muted-foreground">
         {isLogin ? "Don't have an account? " : "Already have an account? "}
-        <a
-          href={isLogin ? "/signup" : "/login"}
-          className="font-medium text-primary hover:text-primary-light"
-        >
-          {isLogin ? "Sign up" : "Sign in"}
-        </a>
+        {onSwitchMode ? (
+          <button
+            type="button"
+            onClick={onSwitchMode}
+            className="font-medium text-primary hover:text-primary-light"
+          >
+            {isLogin ? "Sign up" : "Sign in"}
+          </button>
+        ) : (
+          <a
+            href={isLogin ? "/signup" : "/login"}
+            className="font-medium text-primary hover:text-primary-light"
+          >
+            {isLogin ? "Sign up" : "Sign in"}
+          </a>
+        )}
       </p>
     </div>
   );

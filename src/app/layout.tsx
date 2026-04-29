@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import "@/components/shared/site-chrome.css";
+import { AuthModalProvider } from "@/components/shared/auth-modal-context";
+import { AuthModal } from "@/components/shared/auth-modal";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -40,7 +42,10 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        <AuthModalProvider>
+          {children}
+          <AuthModal />
+        </AuthModalProvider>
       </body>
     </html>
   );
