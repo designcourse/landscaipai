@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { usePurchaseCredits } from "@/components/billing/purchase-credits-modal-context";
 
 interface CanvasToolbarProps {
   projectId: string;
@@ -26,12 +27,26 @@ export function CanvasToolbar({
   onUpload,
 }: CanvasToolbarProps) {
   const router = useRouter();
+  const { open: openPurchaseCredits } = usePurchaseCredits();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [projectDropdownOpen, setProjectDropdownOpen] = useState(false);
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const projectDropdownRef = useRef<HTMLDivElement>(null);
+
+  // When credits are 0, the Upload button can't kick off a useful flow —
+  // intercept it and show the purchase modal instead.
+  function handleUploadClick() {
+    if (credits <= 0) {
+      openPurchaseCredits({
+        title: "You're out of credits",
+        subtitle: "Buy credits to upload a new photo and keep designing.",
+      });
+      return;
+    }
+    onUpload();
+  }
 
   useEffect(() => {
     function handleClickOutside(e: Event) {
@@ -149,7 +164,7 @@ export function CanvasToolbar({
       {/* Right: Upload, Dashboard, Credits, Avatar */}
       <div className="flex items-center gap-8 overflow-hidden">
         <button
-          onClick={onUpload}
+          onClick={handleUploadClick}
           className="flex items-center gap-1.5 whitespace-nowrap text-base font-medium text-foreground transition-colors hover:text-primary"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -166,14 +181,17 @@ export function CanvasToolbar({
         </Link>
 
         <div className="flex items-center gap-3">
-          {/* Credits Badge */}
-          <div
-            className="flex items-center gap-1 rounded-xl px-2.5 py-1"
+          {/* Credits Badge — clickable to buy more */}
+          <button
+            type="button"
+            onClick={() => openPurchaseCredits()}
+            className="flex items-center gap-1 rounded-xl px-2.5 py-1 transition-opacity hover:opacity-80"
             style={{ backgroundColor: "var(--color-credits-badge-bg)" }}
+            aria-label="Buy more credits"
           >
             <span className="inline-block h-1.5 w-1.5 rounded-full bg-primary" />
             <span className="text-sm font-medium text-primary">{credits} credits</span>
-          </div>
+          </button>
 
           {/* Avatar */}
           <div className="relative" ref={dropdownRef}>

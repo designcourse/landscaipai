@@ -6,6 +6,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthModal } from "./auth-modal-context";
+import { usePurchaseCredits } from "@/components/billing/purchase-credits-modal-context";
 import type { Profile } from "@/types";
 
 type NavbarProfile = Pick<
@@ -48,6 +49,7 @@ function Avatar({ url, initials }: { url: string | null; initials: string }) {
 export function SiteNavbarClient({ user, profile }: SiteNavbarClientProps) {
   const router = useRouter();
   const { openModal } = useAuthModal();
+  const { open: openPurchaseCredits } = usePurchaseCredits();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -109,11 +111,16 @@ export function SiteNavbarClient({ user, profile }: SiteNavbarClientProps) {
       <div className="site-nav-right">
         {user ? (
           <>
-            <span className="site-nav-credits">
+            <button
+              type="button"
+              onClick={() => openPurchaseCredits()}
+              className="site-nav-credits"
+              aria-label="Buy more credits"
+            >
               <span className="dot" aria-hidden="true" />
               <span className="n">{profile?.credits_balance ?? 0}</span>
               <span className="lbl">credits</span>
-            </span>
+            </button>
             <Link href="/dashboard" className="btn btn-ghost btn-sm">
               Dashboard
             </Link>

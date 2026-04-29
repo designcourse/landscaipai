@@ -4,6 +4,7 @@ import "./globals.css";
 import "@/components/shared/site-chrome.css";
 import { AuthModalProvider } from "@/components/shared/auth-modal-context";
 import { AuthModal } from "@/components/shared/auth-modal";
+import { PurchaseCreditsProvider } from "@/components/billing/purchase-credits-modal-context";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -43,8 +44,10 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <AuthModalProvider>
-          {children}
-          <AuthModal />
+          <PurchaseCreditsProvider>
+            {children}
+            <AuthModal />
+          </PurchaseCreditsProvider>
         </AuthModalProvider>
       </body>
     </html>

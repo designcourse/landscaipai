@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { usePurchaseCredits } from "@/components/billing/purchase-credits-modal-context";
 import { validateImageFile, ACCEPTED_IMAGE_TYPES } from "@/lib/utils/images";
 import { getUploadPath, BUCKET_UPLOADS } from "@/lib/utils/storage";
 import {
@@ -192,6 +193,7 @@ export function CanvasWorkspace({
   userId,
 }: CanvasWorkspaceProps) {
   const router = useRouter();
+  const { open: openPurchaseCredits } = usePurchaseCredits();
 
   // Canvas items state
   const [canvasItems, setCanvasItems] = useState<CanvasItem[]>(() =>
@@ -911,7 +913,10 @@ export function CanvasWorkspace({
         setCanvasItems((prev) => prev.filter((i) => i.id !== placeholderId));
         removeItemPositions([placeholderId]);
         if (data.code === "NO_CREDITS") {
-          setError("Insufficient credits for this video.");
+          openPurchaseCredits({
+            title: "Not enough credits for this video",
+            subtitle: "Buy more credits to render this clip.",
+          });
         } else {
           setError(data.error || "Failed to start video generation.");
         }
@@ -1243,7 +1248,10 @@ export function CanvasWorkspace({
         // Remove placeholder on failure
         setCanvasItems((prev) => prev.filter((i) => i.id !== placeholderId));
         if (data.code === "NO_CREDITS") {
-          setError("You're out of credits. Visit the pricing page to get more.");
+          openPurchaseCredits({
+            title: "You're out of credits",
+            subtitle: "Buy credits to keep generating.",
+          });
         } else {
           setError(data.error || "Generation failed. Please try again.");
         }

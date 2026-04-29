@@ -11,8 +11,6 @@ export interface VideoModelOption {
   id: string;
   name: string;
   description: string;
-  // Multiplier applied to the base credit cost (see computeCreditCost below)
-  costMultiplier: number;
   // Underlying Gemini API model identifier
   apiModel: string;
 }
@@ -22,14 +20,12 @@ export const VIDEO_MODELS: readonly VideoModelOption[] = [
     id: "veo-3.1-fast",
     name: "Veo 3.1 Fast",
     description: "Google's fastest first/last frame model. Best default.",
-    costMultiplier: 1,
     apiModel: "veo-3.1-fast-generate-preview",
   },
   {
     id: "veo-3.1",
     name: "Veo 3.1",
     description: "Highest fidelity. Slower but more detailed motion.",
-    costMultiplier: 1.5,
     apiModel: "veo-3.1-generate-preview",
   },
 ] as const;
@@ -215,20 +211,33 @@ export const DEFAULT_TRANSITION_PRESET_ID = "natural_morph";
 // ============================================================
 // Credit cost
 // ============================================================
-// Base cost per second for a 720p video. 1080p costs 2x per second.
-// Model multiplier stacks on top.
-const BASE_COST_PER_SECOND = 1.5;
+// Credit costs are aligned to actual Veo API costs at our target ~$0.10/credit
+// retail anchor. Veo 3.1 standard is ~4× the cost of Veo 3.1 Fast at the same
+// resolution, but at the API level both 720p and 1080p cost the same on the
+// standard tier — so the standard tier flat-charges 32 credits regardless of
+// resolution. Veo 3.1 Fast scales with resolution.
+//
+// Per-second API rates (USD):
+//   Veo 3.1 Fast 720p:  $0.10/s × 8s = $0.80  → 8 credits
+//   Veo 3.1 Fast 1080p: $0.12/s × 8s = $0.96  → 10 credits
+//   Veo 3.1 720p:       $0.40/s × 8s = $3.20  → 32 credits
+//   Veo 3.1 1080p:      $0.40/s × 8s = $3.20  → 32 credits
+const VIDEO_CREDIT_COSTS: Record<string, Record<ResolutionOption, number>> = {
+  "veo-3.1-fast": { "720p": 8, "1080p": 10 },
+  "veo-3.1": { "720p": 32, "1080p": 32 },
+};
 
 export function computeCreditCost(opts: {
   modelId: string;
   durationSeconds: number;
   resolution: ResolutionOption;
 }): number {
-  const model = VIDEO_MODELS.find((m) => m.id === opts.modelId);
-  const modelMult = model?.costMultiplier ?? 1;
-  const resMult = opts.resolution === "1080p" ? 2 : 1;
-  const raw = BASE_COST_PER_SECOND * opts.durationSeconds * resMult * modelMult;
-  return Math.max(1, Math.ceil(raw));
+  const byRes = VIDEO_CREDIT_COSTS[opts.modelId];
+  if (byRes && byRes[opts.resolution] != null) {
+    return byRes[opts.resolution];
+  }
+  // Fallback for any future model id not yet in the table — assume Fast pricing
+  return opts.resolution === "1080p" ? 10 : 8;
 }
 
 // ============================================================
