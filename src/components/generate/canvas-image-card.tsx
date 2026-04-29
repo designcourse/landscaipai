@@ -544,10 +544,12 @@ export const CanvasImageCard = memo(function CanvasImageCard({
         );
       })()}
 
-      {/* Library tags (generations only) — fade out when zoomed out to prevent overlap */}
-      {detailOpacity > 0 && item.type === "generation" && item.libraryTags && item.libraryTags.length > 0 && (
-        <div className="mt-7 flex gap-4" style={{ opacity: detailOpacity }}>
-          {item.libraryTags.map((tag) => (
+      {/* Library tags + AI model label (generations only) — fade out when zoomed out */}
+      {detailOpacity > 0 &&
+        item.type === "generation" &&
+        ((item.libraryTags && item.libraryTags.length > 0) || item.generation?.image_model) && (
+        <div className="mt-7 flex items-center gap-4" style={{ opacity: detailOpacity }}>
+          {item.libraryTags?.map((tag) => (
             <button
               key={tag.name}
               className="flex h-[38px] cursor-pointer items-center gap-1 rounded-[7px] bg-white p-[11px] transition-shadow hover:shadow-md"
@@ -567,6 +569,19 @@ export const CanvasImageCard = memo(function CanvasImageCard({
               <span className="text-sm font-bold text-black">{tag.name}</span>
             </button>
           ))}
+
+          {item.generation?.image_model && (
+            <span
+              className="ml-auto text-xs font-bold uppercase tracking-wider"
+              style={{ color: "var(--color-canvas-label)" }}
+            >
+              {item.generation.image_model === "openai"
+                ? "OpenAI Image 2.0"
+                : item.generation.image_model === "gemini-pro"
+                  ? "Nano Banana Pro"
+                  : "Nano Banana 2"}
+            </span>
+          )}
         </div>
       )}
 

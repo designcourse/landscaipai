@@ -97,6 +97,7 @@ export interface Generation {
   status: GenerationStatus;
   error_message: string | null;
   created_at: string;
+  image_model: string | null;
 }
 
 export type CreditTransactionType =

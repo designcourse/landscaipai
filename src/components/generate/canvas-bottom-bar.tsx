@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   STYLE_PRESETS,
   TIME_OF_DAY_OPTIONS,
@@ -45,7 +45,16 @@ interface CanvasBottomBarProps {
   onAddAttachmentFiles: (files: FileList) => void;
   onPasteAttachment: (blob: Blob, name: string) => void;
   onRemoveAttachment: (id: string) => void;
+  // AI model picker
+  imageModel: "gemini" | "gemini-pro" | "openai";
+  onImageModelChange: (model: "gemini" | "gemini-pro" | "openai") => void;
 }
+
+const IMAGE_MODEL_OPTIONS: { id: "gemini" | "gemini-pro" | "openai"; label: string; description: string }[] = [
+  { id: "gemini", label: "Nano Banana 2", description: "Google Gemini 3.1 Flash Image" },
+  { id: "gemini-pro", label: "Nano Banana Pro", description: "Google Gemini 3 Pro Image" },
+  { id: "openai", label: "OpenAI Image 2.0", description: "OpenAI gpt-image-2" },
+];
 
 // Accepted file types for reference attachments
 const ACCEPTED_ATTACHMENT_TYPES = "image/jpeg,image/png,image/webp";
@@ -110,12 +119,26 @@ export function CanvasBottomBar({
   onAddAttachmentFiles,
   onPasteAttachment,
   onRemoveAttachment,
+  imageModel,
+  onImageModelChange,
 }: CanvasBottomBarProps) {
   const [styleDropdownOpen, setStyleDropdownOpen] = useState(false);
   const [promptFocused, setPromptFocused] = useState(false);
+  const [modelMenuOpen, setModelMenuOpen] = useState(false);
   const styleDropdownRef = useRef<HTMLDivElement>(null);
+  const modelMenuRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
+
+  // Close model menu on outside click
+  useEffect(() => {
+    if (!modelMenuOpen) return;
+    function onDown(e: MouseEvent) {
+      if (!modelMenuRef.current?.contains(e.target as Node)) setModelMenuOpen(false);
+    }
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [modelMenuOpen]);
 
   // When promptCollapsed is set externally, blur the textarea
   const promptExpanded = promptFocused && !promptCollapsed;
@@ -334,7 +357,7 @@ export function CanvasBottomBar({
 
         {/* Prompt Panel */}
         <div
-          className="flex w-[405px] flex-col overflow-hidden rounded-[20px] px-[13px] py-3"
+          className="flex w-[405px] flex-col rounded-[20px] px-[13px] py-3"
           style={{
             backgroundColor: "var(--color-canvas-card-bg)",
             boxShadow: "var(--shadow-toolbar)",
@@ -369,25 +392,87 @@ export function CanvasBottomBar({
               className="hidden"
             />
 
-            <textarea
-              ref={textareaRef}
-              value={customPrompt}
-              onChange={(e) => onCustomPromptChange(e.target.value)}
-              onFocus={() => setPromptFocused(true)}
-              onBlur={() => setPromptFocused(false)}
-              onPaste={handlePaste}
-              placeholder={hasMask ? "Describe what to change in the masked area..." : "Custom instructions (Ctrl+V to paste images)"}
-              className="w-full resize-none rounded-[10px] border px-3.5 py-2 text-base text-foreground placeholder:text-[#74716d] focus:outline-none"
-              style={{
-                backgroundColor: "var(--color-canvas-input-bg)",
-                borderColor: "var(--color-canvas-input-border)",
-                height: promptExpanded ? 120 : 40,
-                transition: "height 0.2s ease",
-                overflow: promptExpanded ? "auto" : "hidden",
-                lineHeight: "21px",
-              }}
-              rows={1}
-            />
+            <div className="relative flex-1">
+              <textarea
+                ref={textareaRef}
+                value={customPrompt}
+                onChange={(e) => onCustomPromptChange(e.target.value)}
+                onFocus={() => setPromptFocused(true)}
+                onBlur={() => setPromptFocused(false)}
+                onPaste={handlePaste}
+                placeholder={hasMask ? "Describe what to change in the masked area..." : "Custom instructions (Ctrl+V to paste images)"}
+                className="w-full resize-none rounded-[10px] border py-2 pl-3.5 pr-9 text-base text-foreground placeholder:text-[#74716d] focus:outline-none"
+                style={{
+                  backgroundColor: "var(--color-canvas-input-bg)",
+                  borderColor: "var(--color-canvas-input-border)",
+                  height: promptExpanded ? 120 : 40,
+                  transition: "height 0.2s ease",
+                  overflow: promptExpanded ? "auto" : "hidden",
+                  lineHeight: "21px",
+                }}
+                rows={1}
+              />
+
+              {/* AI model picker (gear icon) */}
+              <div ref={modelMenuRef} className="absolute right-1.5 top-1.5">
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => setModelMenuOpen((v) => !v)}
+                  className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  title={`AI model: ${IMAGE_MODEL_OPTIONS.find((o) => o.id === imageModel)?.label ?? imageModel}`}
+                  aria-label="Select AI model"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </button>
+
+                {modelMenuOpen && (
+                  <div
+                    className="absolute bottom-full right-0 mb-2 w-64 overflow-hidden rounded-lg border border-border bg-white shadow-lg"
+                    onMouseDown={(e) => e.stopPropagation()}
+                  >
+                    <div className="border-b border-border px-3 py-2 text-xs font-medium text-muted-foreground">
+                      AI Model
+                    </div>
+                    {IMAGE_MODEL_OPTIONS.map((opt) => {
+                      const selected = imageModel === opt.id;
+                      return (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => {
+                            onImageModelChange(opt.id);
+                            setModelMenuOpen(false);
+                          }}
+                          className={`flex w-full items-start gap-2 px-3 py-2 text-left transition-colors ${
+                            selected ? "bg-primary/10" : "hover:bg-muted"
+                          }`}
+                        >
+                          <span className="mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center">
+                            {selected ? (
+                              <svg className="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                              </svg>
+                            ) : (
+                              <span className="h-3 w-3 rounded-full border border-border" />
+                            )}
+                          </span>
+                          <span className="flex flex-col">
+                            <span className={`text-sm font-medium ${selected ? "text-primary" : "text-foreground"}`}>
+                              {opt.label}
+                            </span>
+                            <span className="text-xs text-muted-foreground">{opt.description}</span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Tag row — attachments + library items (inline) */}

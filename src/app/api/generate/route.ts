@@ -1,28 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenAI } from "@google/genai";
 import sharp from "sharp";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { deductCredit, refundCredit } from "@/lib/utils/credits";
 import { buildPrompt } from "@/lib/gemini/prompts";
 import { getGenerationPath, BUCKET_GENERATIONS, BUCKET_UPLOADS, fetchLibraryImageParts } from "@/lib/utils/storage";
-import { withGeminiRetry, friendlyGeminiError } from "@/lib/gemini/with-retry";
+import { getImageModel } from "@/lib/image-models";
 
-// Allow up to 3 retry attempts of a ~10-20s Gemini call inside one request.
+// Allow up to 3 retry attempts of a ~10-20s AI call inside one request.
 export const maxDuration = 60;
-
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
-
-/**
- * Determine the closest Gemini imageSize for a given resolution.
- */
-function getImageSize(width: number, height: number): string {
-  const longest = Math.max(width, height);
-  if (longest <= 512) return "512px";
-  if (longest <= 1024) return "1K";
-  if (longest <= 2048) return "2K";
-  return "4K";
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -50,6 +36,7 @@ export async function POST(request: NextRequest) {
       selectedPlants,
       selectedHardscape,
       referenceImages,
+      model,
     } = body as {
       imageId: string;
       projectId: string;
@@ -62,6 +49,7 @@ export async function POST(request: NextRequest) {
       selectedPlants?: { common_name: string; scientific_name: string | null; image_path?: string | null }[];
       selectedHardscape?: { common_name: string; image_path?: string | null }[];
       referenceImages?: { base64: string; mimeType: string }[];
+      model?: string;
     };
 
     if (!imageId || !projectId) {
@@ -134,7 +122,6 @@ export async function POST(request: NextRequest) {
     const sourceMeta = await sharp(sourceBuffer).metadata();
     const sourceWidth = sourceMeta.width ?? 1024;
     const sourceHeight = sourceMeta.height ?? 1024;
-    const imageSize = getImageSize(sourceWidth, sourceHeight);
 
     // 5. Create generation record (pending)
     const generationId = crypto.randomUUID();
@@ -153,6 +140,9 @@ export async function POST(request: NextRequest) {
         }))
       : null;
 
+    const imageModel = getImageModel(model);
+    console.log(`[generate] model=${imageModel.name} generationId=${generationId}`);
+
     const { error: insertError } = await admin.from("generations").insert({
       id: generationId,
       image_id: imageId,
@@ -168,6 +158,7 @@ export async function POST(request: NextRequest) {
       weather: weather || null,
       is_inpaint: false,
       status: "pending",
+      image_model: imageModel.name,
     });
 
     if (insertError) {
@@ -201,63 +192,38 @@ export async function POST(request: NextRequest) {
       fetchLibraryImageParts(admin, allSelectedItems),
     ]);
 
-    // 9. Call Gemini
-    let generatedImageBase64: string | null = null;
+    // 9. Call image model
+    let generatedImageBase64: string;
 
     try {
-      // Build parts: source photo first, then reference images, then prompt
-      const parts: { inlineData?: { mimeType: string; data: string }; text?: string }[] = [
-        { inlineData: { mimeType, data: base64Image } },
+      const allRefs = [
+        ...refImages.map((r) => ({ base64: r.data, mimeType: r.mimeType })),
+        ...(referenceImages ?? []),
       ];
-      for (const ref of refImages) {
-        parts.push({ inlineData: { mimeType: ref.mimeType, data: ref.data } });
-      }
-      // User-attached reference images
-      if (referenceImages?.length) {
-        for (const ref of referenceImages) {
-          parts.push({ inlineData: { mimeType: ref.mimeType, data: ref.base64 } });
-        }
-      }
-      parts.push({ text: prompt });
 
-      const response = await withGeminiRetry(
-        () =>
-          ai.models.generateContent({
-            model: "gemini-3.1-flash-image-preview",
-            contents: [{ role: "user", parts }],
-            config: {
-              responseModalities: ["TEXT", "IMAGE"],
-              imageConfig: { imageSize },
-            },
-          }),
-        {
-          onRetry: (err, attempt, nextDelayMs) => {
-            const msg = err instanceof Error ? err.message : String(err);
-            console.warn(
-              `[generate] transient Gemini error on attempt ${attempt}, retrying in ${Math.round(nextDelayMs)}ms:`,
-              msg,
-            );
-          },
+      const result = await imageModel.generate({
+        sourceImage: { base64: base64Image, mimeType },
+        referenceImages: allRefs,
+        prompt,
+        width: sourceWidth,
+        height: sourceHeight,
+        onRetry: (err, attempt, nextDelayMs) => {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn(
+            `[generate/${imageModel.name}] transient error on attempt ${attempt}, retrying in ${Math.round(nextDelayMs)}ms:`,
+            msg,
+          );
         },
-      );
+      });
 
-      for (const part of response.candidates?.[0]?.content?.parts ?? []) {
-        if (part.inlineData?.data) {
-          generatedImageBase64 = part.inlineData.data;
-          break;
-        }
-      }
-
-      if (!generatedImageBase64) {
-        throw new Error("No image returned from Gemini");
-      }
+      generatedImageBase64 = result.base64;
     } catch (err: unknown) {
       // Refund credit on AI failure
       await refundCredit(user.id, generationId);
 
       const rawMessage =
         err instanceof Error ? err.message : "AI generation failed";
-      const userMessage = friendlyGeminiError(err);
+      const userMessage = imageModel.friendlyError(err);
       await admin
         .from("generations")
         .update({ status: "failed", error_message: rawMessage })
@@ -313,6 +279,7 @@ export async function POST(request: NextRequest) {
         time_of_day: timeOfDay || null,
         season: season || null,
         weather: weather || null,
+        image_model: imageModel.name,
         url: urlData?.signedUrl ?? "",
       },
       credits_remaining: profile?.credits_balance ?? 0,

@@ -227,6 +227,21 @@ export function CanvasWorkspace({
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // AI model choice (persisted). Options:
+  //   "gemini" = Nano Banana 2, "gemini-pro" = Nano Banana Pro, "openai" = OpenAI Image 2.0
+  const [imageModel, setImageModel] = useState<"gemini" | "gemini-pro" | "openai">("gemini");
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem("landscaip-image-model");
+    if (stored === "gemini" || stored === "gemini-pro" || stored === "openai") setImageModel(stored);
+  }, []);
+  const handleImageModelChange = useCallback((next: "gemini" | "gemini-pro" | "openai") => {
+    setImageModel(next);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("landscaip-image-model", next);
+    }
+  }, []);
+
   // In-painting state
   const [inpaintMode, setInpaintMode] = useState(false);
   const [inpaintImageUrl, setInpaintImageUrl] = useState<string>("");
@@ -1208,6 +1223,7 @@ export function CanvasWorkspace({
         selectedPlants: selectedPlants.length > 0 ? selectedPlants : undefined,
         selectedHardscape: selectedHardscape.length > 0 ? selectedHardscape : undefined,
         referenceImages: referenceImagesPayload,
+        model: imageModel,
       };
 
       if (maskBase64) {
@@ -1289,6 +1305,7 @@ export function CanvasWorkspace({
                   status: "completed" as const,
                   error_message: null,
                   created_at: new Date().toISOString(),
+                  image_model: genData.image_model ?? null,
                   url: genData.url,
                 },
                 libraryTags: libraryTags.length > 0 ? libraryTags : undefined,
@@ -1552,6 +1569,8 @@ export function CanvasWorkspace({
           onAddAttachmentFiles={handleAddAttachmentFiles}
           onPasteAttachment={handlePasteAttachment}
           onRemoveAttachment={handleRemoveAttachment}
+          imageModel={imageModel}
+          onImageModelChange={handleImageModelChange}
         />
       </div>
 

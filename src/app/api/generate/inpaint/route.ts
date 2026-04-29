@@ -1,80 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenAI } from "@google/genai";
 import sharp from "sharp";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { deductCredit, refundCredit } from "@/lib/utils/credits";
-import { buildInpaintPrompt } from "@/lib/gemini/prompts";
+import { buildInpaintPrompt, buildInpaintPromptForOpenAI } from "@/lib/gemini/prompts";
 import {
   getGenerationPath,
   BUCKET_GENERATIONS,
   BUCKET_UPLOADS,
   fetchLibraryImageParts,
 } from "@/lib/utils/storage";
-import { withGeminiRetry, friendlyGeminiError } from "@/lib/gemini/with-retry";
+import { getImageModel } from "@/lib/image-models";
 
-// Allow up to 3 retry attempts of a ~10-20s Gemini call inside one request.
+// Allow up to 3 retry attempts of a ~10-20s AI call inside one request.
 export const maxDuration = 60;
-
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
-
-/**
- * Determine the closest Gemini imageSize for a given resolution.
- */
-function getImageSize(width: number, height: number): string {
-  const longest = Math.max(width, height);
-  if (longest <= 512) return "512px";
-  if (longest <= 1024) return "1K";
-  if (longest <= 2048) return "2K";
-  return "4K";
-}
-
-/**
- * Composite the original image with the AI-generated result using the mask.
- * - Black mask pixels → original image (untouched)
- * - White mask pixels → Gemini result
- * - Feathered boundary (15px blur) for smooth blending at mask edges
- */
-async function compositeWithMask(
-  originalBuffer: Buffer,
-  generatedBuffer: Buffer,
-  maskBuffer: Buffer
-): Promise<Buffer> {
-  const { width: w, height: h } = await sharp(originalBuffer).metadata();
-  const width = w!;
-  const height = h!;
-
-  // Blur creates a gradient at the mask boundary for smooth blending
-  const featherRadius = Math.max(7, Math.round(Math.min(width, height) * 0.01));
-  const sigma = featherRadius % 2 === 0 ? featherRadius + 1 : featherRadius;
-
-  // Parallelize all three resize operations — ensure 3-channel RGB (no alpha surprises)
-  const [resizedGenerated, processedMask, originalRaw] = await Promise.all([
-    sharp(generatedBuffer).resize(width, height, { fit: "fill" }).removeAlpha().raw().toBuffer(),
-    sharp(maskBuffer).resize(width, height, { fit: "fill" }).grayscale().blur(sigma).raw().toBuffer(),
-    sharp(originalBuffer).resize(width, height, { fit: "fill" }).removeAlpha().raw().toBuffer(),
-  ]);
-
-  // Composite: alpha-blend original and generated based on mask intensity
-  const outputPixels = Buffer.alloc(width * height * 3);
-  for (let i = 0; i < width * height; i++) {
-    const maskVal = processedMask[i] / 255; // 0 = keep original, 1 = use generated
-    const ri = i * 3;
-    outputPixels[ri] = Math.round(
-      originalRaw[ri] * (1 - maskVal) + resizedGenerated[ri] * maskVal
-    );
-    outputPixels[ri + 1] = Math.round(
-      originalRaw[ri + 1] * (1 - maskVal) + resizedGenerated[ri + 1] * maskVal
-    );
-    outputPixels[ri + 2] = Math.round(
-      originalRaw[ri + 2] * (1 - maskVal) + resizedGenerated[ri + 2] * maskVal
-    );
-  }
-
-  return sharp(outputPixels, { raw: { width, height, channels: 3 } })
-    .webp({ quality: 90 })
-    .toBuffer();
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -104,6 +43,7 @@ export async function POST(request: NextRequest) {
       selectedPlants,
       selectedHardscape,
       referenceImages,
+      model,
     } = body as {
       imageId: string;
       projectId: string;
@@ -118,6 +58,7 @@ export async function POST(request: NextRequest) {
       selectedPlants?: { common_name: string; scientific_name: string | null; image_path?: string | null }[];
       selectedHardscape?: { common_name: string; image_path?: string | null }[];
       referenceImages?: { base64: string; mimeType: string }[];
+      model?: string;
     };
 
     if (!imageId || !projectId) {
@@ -210,14 +151,21 @@ export async function POST(request: NextRequest) {
         ? "image/webp"
         : "image/jpeg";
 
-    // Get source image dimensions for matching Gemini output resolution
+    // Get source image dimensions for matching AI output resolution
     const sourceMeta = await sharp(sourceBuffer).metadata();
-    const imageSize = getImageSize(sourceMeta.width ?? 1024, sourceMeta.height ?? 1024);
+    const sourceWidth = sourceMeta.width ?? 1024;
+    const sourceHeight = sourceMeta.height ?? 1024;
 
     // 5. Create generation record (pending)
     const generationId = crypto.randomUUID();
     const storagePath = getGenerationPath(user.id, projectId, generationId);
-    const prompt = buildInpaintPrompt({
+
+    // Pick the model early so we can choose the right prompt dialect.
+    // Gemini sees a visual red-overlay mask baked into the image, so it needs
+    // "green area" phrasing. OpenAI gets a clean source + separate alpha mask,
+    // so it must receive "masked region" phrasing — otherwise it hallucinates.
+    const imageModel = getImageModel(model);
+    const promptParams = {
       customPrompt: customPrompt.trim(),
       style: style || null,
       timeOfDay,
@@ -227,7 +175,11 @@ export async function POST(request: NextRequest) {
       selectedHardscape,
       hasSceneChange,
       hasReferenceAttachments: (referenceImages?.length ?? 0) > 0,
-    });
+    };
+    const prompt =
+      imageModel.name === "openai"
+        ? buildInpaintPromptForOpenAI(promptParams)
+        : buildInpaintPrompt(promptParams);
 
     // Build library items metadata for persistence
     const allLibItems = [...(selectedPlants ?? []), ...(selectedHardscape ?? [])];
@@ -240,6 +192,8 @@ export async function POST(request: NextRequest) {
             : "",
         }))
       : null;
+
+    console.log(`[inpaint] model=${imageModel.name} generationId=${generationId}`);
 
     const { error: insertError } = await admin.from("generations").insert({
       id: generationId,
@@ -256,6 +210,7 @@ export async function POST(request: NextRequest) {
       weather: weather || null,
       is_inpaint: true,
       status: "pending",
+      image_model: imageModel.name,
     });
 
     if (insertError) {
@@ -289,69 +244,46 @@ export async function POST(request: NextRequest) {
       fetchLibraryImageParts(admin, allSelectedItems),
     ]);
 
-    // 9. Call Gemini — send mask overlay + reference images + prompt
-    let generatedImageBase64: string | null = null;
+    // 9. Call the provider's fully self-contained inpaint pipeline.
+    // Each provider owns its own post-processing (Gemini composites + feathers
+    // with the raw mask; OpenAI relies on its own alpha-mask edit and only
+    // resizes). The route does NOT touch the output beyond uploading it.
+    let finalImageBuffer: Buffer;
+    let finalMimeType: string;
 
     try {
-      const parts: { inlineData?: { mimeType: string; data: string }; text?: string }[] = [
-        { inlineData: { mimeType: "image/jpeg", data: maskOverlayBase64 } },
+      const allRefs = [
+        ...refImages.map((r) => ({ base64: r.data, mimeType: r.mimeType })),
+        ...(referenceImages ?? []),
       ];
-      for (const ref of refImages) {
-        parts.push({ inlineData: { mimeType: ref.mimeType, data: ref.data } });
-      }
-      // User-attached reference images
-      if (referenceImages?.length) {
-        for (const ref of referenceImages) {
-          parts.push({ inlineData: { mimeType: ref.mimeType, data: ref.base64 } });
-        }
-      }
-      parts.push({ text: prompt });
 
-      const response = await withGeminiRetry(
-        () =>
-          ai.models.generateContent({
-            model: "gemini-3.1-flash-image-preview",
-            contents: [{ role: "user", parts }],
-            config: {
-              responseModalities: ["TEXT", "IMAGE"],
-              imageConfig: { imageSize },
-            },
-          }),
-        {
-          onRetry: (err, attempt, nextDelayMs) => {
-            const msg = err instanceof Error ? err.message : String(err);
-            console.warn(
-              `[inpaint] transient Gemini error on attempt ${attempt}, retrying in ${Math.round(nextDelayMs)}ms:`,
-              msg,
-            );
-          },
+      const result = await imageModel.inpaint({
+        sourceBuffer,
+        sourceMimeType,
+        maskOverlayImage: { base64: maskOverlayBase64, mimeType: "image/jpeg" },
+        rawMaskBase64,
+        referenceImages: allRefs,
+        prompt,
+        width: sourceWidth,
+        height: sourceHeight,
+        hasSceneChange,
+        onRetry: (err, attempt, nextDelayMs) => {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn(
+            `[inpaint/${imageModel.name}] transient error on attempt ${attempt}, retrying in ${Math.round(nextDelayMs)}ms:`,
+            msg,
+          );
         },
-      );
+      });
 
-      let textResponse = "";
-      for (const part of response.candidates?.[0]?.content?.parts ?? []) {
-        if (part.inlineData?.data) {
-          generatedImageBase64 = part.inlineData.data;
-          break;
-        }
-        if (part.text) {
-          textResponse += part.text;
-        }
-      }
-
-      if (!generatedImageBase64) {
-        const detail = textResponse
-          ? `Gemini responded with text instead of an image: "${textResponse.slice(0, 200)}"`
-          : "No image returned from Gemini";
-        throw new Error(detail);
-      }
+      finalImageBuffer = result.buffer;
+      finalMimeType = result.mimeType;
     } catch (err: unknown) {
-      // Refund credit on AI failure
       await refundCredit(user.id, generationId);
 
       const rawMessage =
         err instanceof Error ? err.message : "AI generation failed";
-      const userMessage = friendlyGeminiError(err);
+      const userMessage = imageModel.friendlyError(err);
       await admin
         .from("generations")
         .update({ status: "failed", error_message: rawMessage })
@@ -360,42 +292,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: userMessage }, { status: 502 });
     }
 
-    // 9. Composite: blend original + Gemini result using the raw mask
-    // This guarantees pixel-perfect preservation outside the masked area
-    // with a feathered boundary for natural blending.
-    // EXCEPTION: when scene-wide settings changed (time/season/weather), skip
-    // compositing so the full Gemini output is used — otherwise compositing
-    // pastes the old lighting/atmosphere back over the non-masked areas.
-    let finalImageBuffer: Buffer;
-
-    if (rawMaskBase64 && !hasSceneChange) {
-      console.log("[inpaint] Compositing with mask — rawMaskBase64 length:", rawMaskBase64.length);
-      const generatedBuffer = Buffer.from(generatedImageBase64, "base64");
-      const maskBuffer = Buffer.from(rawMaskBase64, "base64");
-      finalImageBuffer = await compositeWithMask(
-        sourceBuffer,
-        generatedBuffer,
-        maskBuffer
-      );
-    } else {
-      if (hasSceneChange) {
-        console.log("[inpaint] Scene settings changed — using full Gemini output (no compositing)");
-      } else {
-        console.warn("[inpaint] No rawMaskBase64 — skipping composite, using raw Gemini output");
-      }
-      // Use full Gemini output, resize to match source dimensions
-      const generatedBuffer = Buffer.from(generatedImageBase64, "base64");
-      finalImageBuffer = await sharp(generatedBuffer)
-        .resize(sourceMeta.width!, sourceMeta.height!, { fit: "fill" })
-        .webp({ quality: 90 })
-        .toBuffer();
-    }
-
     // 10. Upload final image to storage
     const { error: uploadError } = await admin.storage
       .from(BUCKET_GENERATIONS)
       .upload(storagePath, finalImageBuffer, {
-        contentType: "image/webp",
+        contentType: finalMimeType,
         cacheControl: "3600",
       });
 
@@ -443,6 +344,7 @@ export async function POST(request: NextRequest) {
         season: season || null,
         weather: weather || null,
         is_inpaint: true,
+        image_model: imageModel.name,
         url: urlData?.signedUrl ?? "",
       },
       credits_remaining: profile?.credits_balance ?? 0,

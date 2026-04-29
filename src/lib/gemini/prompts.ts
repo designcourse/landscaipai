@@ -333,3 +333,78 @@ export function buildInpaintPrompt(params: InpaintParams): string {
 
   return parts.join(" ");
 }
+
+/**
+ * Prompt for OpenAI gpt-image-2 `images.edit`.
+ *
+ * Unlike Gemini (which receives a JPEG with a red/green overlay baked into
+ * the image), OpenAI receives a CLEAN source + a separate alpha-channel mask.
+ * The model already knows the edit region from the mask — we must NOT reference
+ * any visual overlay ("green area", "red overlay"), or it will hallucinate.
+ */
+export function buildInpaintPromptForOpenAI(params: InpaintParams): string {
+  const sceneWide = params.hasSceneChange && (params.timeOfDay || params.season || params.weather);
+
+  const parts = [
+    `Edit only the masked (transparent) region of this photo: ${params.customPrompt}.`,
+  ];
+
+  if (sceneWide) {
+    parts.push(
+      "New content must be correctly scaled relative to structures in the scene — respect depth and perspective.",
+      "For areas outside the mask, keep the same plants, structures, composition, and camera angle, but apply the scene-wide lighting/atmosphere changes (time of day, season, weather listed below) uniformly to the ENTIRE image so the whole scene is visually consistent."
+    );
+  } else {
+    parts.push(
+      "Match the existing photo's lighting, color temperature, brightness, contrast, shadows, and perspective exactly. New content must be scaled correctly relative to surrounding structures.",
+      "Keep everything outside the masked region exactly as it appears in the source photo — do not modify any other part of the image."
+    );
+  }
+
+  if (params.style) {
+    const preset = STYLE_PRESETS.find((p) => p.id === params.style);
+    if (preset) {
+      parts.push(`Style for the edited area: "${preset.name}" — ${preset.description}.`);
+    }
+  }
+
+  if (params.selectedPlants?.length) {
+    const list = formatItemList(params.selectedPlants, true);
+    parts.push(
+      hasReferenceImages(params.selectedPlants)
+        ? `Use these specific plants in the edited area (reference images show species — match leaf shape, color, and flower style, but vary size/shape/maturity so each plant looks unique):\n${list}`
+        : `Use these specific plants in the edited area: ${list}.`
+    );
+  }
+
+  if (params.selectedHardscape?.length) {
+    const list = formatItemList(params.selectedHardscape, false);
+    parts.push(
+      hasReferenceImages(params.selectedHardscape)
+        ? `Use these hardscape elements in the edited area (reference images show texture/material — integrate naturally):\n${list}`
+        : `Use these hardscape elements in the edited area: ${list}.`
+    );
+  }
+
+  if (params.hasReferenceAttachments) {
+    parts.push(
+      "Additional reference images have been attached by the user. Use them as visual context for the edit area only."
+    );
+  }
+
+  if (params.timeOfDay) parts.push(`Time of day: ${params.timeOfDay}.`);
+  if (params.season) parts.push(`Season: ${params.season}.`);
+  if (params.weather) parts.push(`Weather conditions: ${params.weather}.`);
+
+  if (sceneWide) {
+    parts.push(
+      "Maintain the exact same camera angle, lens perspective, and depth of field as the original photo. Apply time/season/weather changes uniformly across the entire scene."
+    );
+  } else {
+    parts.push(
+      "Maintain the exact same camera angle, lens perspective, and depth of field as the original photo."
+    );
+  }
+
+  return parts.join(" ");
+}

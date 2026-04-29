@@ -194,6 +194,7 @@ export function GenerationWorkspace({
         status: "completed",
         error_message: null,
         created_at: new Date().toISOString(),
+        image_model: data.generation.image_model ?? null,
         url: data.generation.url,
       };
 
