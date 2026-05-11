@@ -29,6 +29,7 @@
 .landing-root {
   background: var(--ls-bg);
   color: var(--ls-fg);
+  overflow-x: clip;
 }
 .landing-root *,
 .landing-root *::before,
@@ -163,6 +164,7 @@
 .landing-root .hero {
   position: relative;
   background: #fbf9f5;
+  overflow: hidden;
 }
 .landing-root .vA {
   max-width: 1320px;

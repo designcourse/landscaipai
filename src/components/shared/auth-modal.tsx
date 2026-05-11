@@ -20,7 +20,7 @@ export function AuthModal() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center px-element"
+      className="fixed inset-0 z-50 flex items-stretch justify-center sm:items-center sm:px-element"
       role="dialog"
       aria-modal="true"
     >
@@ -29,7 +29,7 @@ export function AuthModal() {
         onClick={closeModal}
         aria-hidden="true"
       />
-      <div className="relative w-full max-w-md rounded-lg bg-background p-section shadow-lg">
+      <div className="relative flex h-full w-full flex-col overflow-y-auto bg-background p-6 sm:h-auto sm:max-w-md sm:rounded-lg sm:p-section sm:shadow-lg">
         <button
           type="button"
           onClick={closeModal}
@@ -48,13 +48,15 @@ export function AuthModal() {
             <path d="M6 6l12 12M18 6L6 18" />
           </svg>
         </button>
-        <AuthForm
-          key={mode}
-          mode={mode}
-          variant="modal"
-          onSwitchMode={() => setMode(mode === "login" ? "signup" : "login")}
-          onSuccess={closeModal}
-        />
+        <div className="my-auto flex w-full justify-center">
+          <AuthForm
+            key={mode}
+            mode={mode}
+            variant="modal"
+            onSwitchMode={() => setMode(mode === "login" ? "signup" : "login")}
+            onSuccess={closeModal}
+          />
+        </div>
       </div>
     </div>
   );

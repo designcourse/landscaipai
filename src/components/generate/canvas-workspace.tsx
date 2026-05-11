@@ -16,11 +16,14 @@ import { InfiniteCanvas } from "./infinite-canvas";
 import { CanvasImageCard, type CanvasItem } from "./canvas-image-card";
 import { CanvasToolbar } from "./canvas-toolbar";
 import { CanvasBottomBar } from "./canvas-bottom-bar";
+import { CanvasMobileToolbar } from "./canvas-mobile-toolbar";
+import { CanvasMobileDock } from "./canvas-mobile-dock";
 import { ZoomIndicator } from "./zoom-indicator";
 import { InpaintCanvas } from "./inpaint-canvas";
 import { PlantBrowser } from "./plant-browser";
 import { VideoGenerationModal, type VideoGenerationSubmit } from "./video-generation-modal";
 import { FinalizeVideoModal } from "./finalize-video-modal";
+import { useIsMobile } from "@/hooks/use-is-mobile";
 import {
   VIDEO_MODELS,
   CAMERA_PRESETS,
@@ -194,6 +197,7 @@ export function CanvasWorkspace({
 }: CanvasWorkspaceProps) {
   const router = useRouter();
   const { open: openPurchaseCredits } = usePurchaseCredits();
+  const isMobile = useIsMobile(1024);
 
   // Canvas items state
   const [canvasItems, setCanvasItems] = useState<CanvasItem[]>(() =>
@@ -255,8 +259,9 @@ export function CanvasWorkspace({
   const [selectedLibraryItems, setSelectedLibraryItems] = useState<LibraryItem[]>([]);
   const [browserFocusId, setBrowserFocusId] = useState<string | null>(null);
 
-  // Upload ref
+  // Upload refs
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   // Viewport (zoom/pan)
   const canvasContainerRef = useRef<HTMLDivElement>(null);
@@ -1453,10 +1458,14 @@ export function CanvasWorkspace({
     fileInputRef.current?.click();
   }
 
+  function handleCameraClick() {
+    cameraInputRef.current?.click();
+  }
+
   function handleFileInputChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (file) handleUploadFile(file);
-    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (e.target) e.target.value = "";
   }
 
   // --- Zoom indicator helpers ---
@@ -1472,7 +1481,7 @@ export function CanvasWorkspace({
 
   return (
     <div className="relative flex h-full w-full flex-col" ref={canvasContainerRef}>
-      {/* Hidden file input for uploads */}
+      {/* Hidden file inputs for uploads */}
       <input
         ref={fileInputRef}
         type="file"
@@ -1480,20 +1489,39 @@ export function CanvasWorkspace({
         onChange={handleFileInputChange}
         className="hidden"
       />
-
-      {/* Top Toolbar */}
-      <CanvasToolbar
-        projectId={project.id}
-        projectName={project.name}
-        credits={credits}
-        userProfile={userProfile}
-        onUpload={handleUploadClick}
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={handleFileInputChange}
+        className="hidden"
       />
+
+      {/* Top Toolbar — mobile vs desktop variant */}
+      {isMobile ? (
+        <CanvasMobileToolbar
+          projectId={project.id}
+          projectName={project.name}
+          credits={credits}
+          userProfile={userProfile}
+          onUpload={handleUploadClick}
+        />
+      ) : (
+        <CanvasToolbar
+          projectId={project.id}
+          projectName={project.name}
+          credits={credits}
+          userProfile={userProfile}
+          onUpload={handleUploadClick}
+        />
+      )}
 
       {/* Canvas area (fills remaining space) */}
       <div className="relative flex-1">
         <InfiniteCanvas
           viewport={viewport}
+          setViewport={setViewport}
           onWheel={handleWheel}
           onPointerDown={handlePointerDownForPan}
           onPointerMove={handlePointerMoveForPan}
@@ -1531,6 +1559,60 @@ export function CanvasWorkspace({
           })}
         </InfiniteCanvas>
 
+        {/* Empty-state upload CTA — shown when project has no images */}
+        {canvasItems.length === 0 && (
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center px-6">
+            <div
+              className="pointer-events-auto flex w-full max-w-sm flex-col items-center gap-4 rounded-lg border border-border bg-white p-6 text-center"
+              style={{ boxShadow: "var(--shadow-md)" }}
+            >
+              <div
+                className="flex h-14 w-14 items-center justify-center rounded-full"
+                style={{ backgroundColor: "var(--color-credits-badge-bg)" }}
+              >
+                <svg className="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
+                </svg>
+              </div>
+              <div className="space-y-1">
+                <p className="text-base font-semibold text-foreground">Add your first photo</p>
+                <p className="text-sm text-muted-foreground">
+                  Upload a picture of your home or yard to start designing.
+                </p>
+              </div>
+              <div className="flex w-full flex-col gap-2">
+                {isMobile && (
+                  <button
+                    type="button"
+                    onClick={handleCameraClick}
+                    className="flex h-11 w-full items-center justify-center gap-2 rounded-md bg-primary text-sm font-semibold text-white transition-colors hover:bg-primary-light"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    Take photo
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleUploadClick}
+                  className={
+                    isMobile
+                      ? "flex h-11 w-full items-center justify-center gap-2 rounded-md border border-border bg-white text-sm font-semibold text-foreground transition-colors hover:bg-muted"
+                      : "flex h-11 w-full items-center justify-center gap-2 rounded-md bg-primary text-sm font-semibold text-white transition-colors hover:bg-primary-light"
+                  }
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
+                  </svg>
+                  Choose photo
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Zoom Indicator */}
         <ZoomIndicator
           zoom={viewport.zoom}
@@ -1539,47 +1621,95 @@ export function CanvasWorkspace({
           onReset={resetZoom}
         />
 
-        {/* Bottom Bar */}
-        <CanvasBottomBar
-          style={style}
-          onStyleChange={setStyle}
-          timeOfDay={timeOfDay}
-          onTimeOfDayChange={setTimeOfDay}
-          season={season}
-          onSeasonChange={setSeason}
-          weather={weather}
-          onWeatherChange={setWeather}
-          customPrompt={customPrompt}
-          onCustomPromptChange={setCustomPrompt}
-          onGenerate={handleGenerate}
-          onOpenLibrary={() => setBrowserOpen(true)}
-          onOpenVideoModal={handleOpenVideoModal}
-          videoButtonState={videoButtonState}
-          generating={generating}
-          credits={credits}
-          hasSelection={selectedItemIds.size > 0}
-          hasMask={!!maskBase64}
-          error={error}
-          selectedLibraryItems={selectedLibraryItems}
-          onRemoveLibraryItem={(id) =>
-            setSelectedLibraryItems((prev) => prev.filter((i) => i.id !== id))
-          }
-          onLibraryItemClick={(id) => {
-            setBrowserFocusId(id);
-            setBrowserOpen(true);
-          }}
-          promptCollapsed={promptCollapsed}
-          attachments={referenceAttachments.map((a) => ({
-            id: a.id,
-            name: a.name,
-            previewUrl: a.previewUrl,
-          }))}
-          onAddAttachmentFiles={handleAddAttachmentFiles}
-          onPasteAttachment={handlePasteAttachment}
-          onRemoveAttachment={handleRemoveAttachment}
-          imageModel={imageModel}
-          onImageModelChange={handleImageModelChange}
-        />
+        {/* Bottom Bar — mobile dock vs desktop bar */}
+        {isMobile ? (
+          <CanvasMobileDock
+            style={style}
+            onStyleChange={setStyle}
+            timeOfDay={timeOfDay}
+            onTimeOfDayChange={setTimeOfDay}
+            season={season}
+            onSeasonChange={setSeason}
+            weather={weather}
+            onWeatherChange={setWeather}
+            customPrompt={customPrompt}
+            onCustomPromptChange={setCustomPrompt}
+            onGenerate={handleGenerate}
+            onOpenLibrary={() => setBrowserOpen(true)}
+            onOpenVideoModal={handleOpenVideoModal}
+            videoButtonState={videoButtonState}
+            generating={generating}
+            credits={credits}
+            hasSelection={selectedItemIds.size > 0}
+            hasMask={!!maskBase64}
+            error={error}
+            selectedLibraryItems={selectedLibraryItems}
+            onRemoveLibraryItem={(id) =>
+              setSelectedLibraryItems((prev) => prev.filter((i) => i.id !== id))
+            }
+            onLibraryItemClick={(id) => {
+              setBrowserFocusId(id);
+              setBrowserOpen(true);
+            }}
+            attachments={referenceAttachments.map((a) => ({
+              id: a.id,
+              name: a.name,
+              previewUrl: a.previewUrl,
+            }))}
+            onAddAttachmentFiles={handleAddAttachmentFiles}
+            onPasteAttachment={handlePasteAttachment}
+            onRemoveAttachment={handleRemoveAttachment}
+            imageModel={imageModel}
+            onImageModelChange={handleImageModelChange}
+            onEditRegion={
+              primarySelectedId ? () => handleEditRegion(primarySelectedId) : undefined
+            }
+            onRequestDelete={
+              primarySelectedId ? () => handleRequestDelete(primarySelectedId) : undefined
+            }
+          />
+        ) : (
+          <CanvasBottomBar
+            style={style}
+            onStyleChange={setStyle}
+            timeOfDay={timeOfDay}
+            onTimeOfDayChange={setTimeOfDay}
+            season={season}
+            onSeasonChange={setSeason}
+            weather={weather}
+            onWeatherChange={setWeather}
+            customPrompt={customPrompt}
+            onCustomPromptChange={setCustomPrompt}
+            onGenerate={handleGenerate}
+            onOpenLibrary={() => setBrowserOpen(true)}
+            onOpenVideoModal={handleOpenVideoModal}
+            videoButtonState={videoButtonState}
+            generating={generating}
+            credits={credits}
+            hasSelection={selectedItemIds.size > 0}
+            hasMask={!!maskBase64}
+            error={error}
+            selectedLibraryItems={selectedLibraryItems}
+            onRemoveLibraryItem={(id) =>
+              setSelectedLibraryItems((prev) => prev.filter((i) => i.id !== id))
+            }
+            onLibraryItemClick={(id) => {
+              setBrowserFocusId(id);
+              setBrowserOpen(true);
+            }}
+            promptCollapsed={promptCollapsed}
+            attachments={referenceAttachments.map((a) => ({
+              id: a.id,
+              name: a.name,
+              previewUrl: a.previewUrl,
+            }))}
+            onAddAttachmentFiles={handleAddAttachmentFiles}
+            onPasteAttachment={handlePasteAttachment}
+            onRemoveAttachment={handleRemoveAttachment}
+            imageModel={imageModel}
+            onImageModelChange={handleImageModelChange}
+          />
+        )}
       </div>
 
       {/* In-painting canvas overlay */}

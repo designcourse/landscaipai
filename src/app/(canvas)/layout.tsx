@@ -10,7 +10,7 @@ export default async function CanvasLayout({
   if (!user) redirect("/login");
 
   return (
-    <div className="h-screen w-screen overflow-hidden">
+    <div className="h-dvh w-screen overflow-hidden">
       {children}
     </div>
   );
