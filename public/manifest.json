@@ -3,7 +3,7 @@
   "name": "Landscaip",
   "short_name": "Landscaip",
   "description": "AI-powered landscaping visualization. Upload a photo of your house, get professional landscaping designs in seconds.",
-  "start_url": "/",
+  "start_url": "/login",
   "scope": "/",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],

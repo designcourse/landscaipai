@@ -1,4 +1,5 @@
 import "@/components/landing/landing.css";
+import { PwaLandingGuard } from "@/components/shared/pwa-landing-guard";
 import { LandingHero } from "@/components/landing/landing-hero";
 import { LandingLibrary } from "@/components/landing/landing-library";
 import { LandingPlantDetail } from "@/components/landing/landing-plant-detail";
@@ -25,6 +26,7 @@ export const metadata = {
 export default function LandingPage() {
   return (
     <main className="landing-root">
+      <PwaLandingGuard />
       <LandingHero />
       <LandingLibrary />
       <LandingPlantDetail />
