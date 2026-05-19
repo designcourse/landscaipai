@@ -238,8 +238,9 @@ export function VideoGenerationModal({
 
       {/* Body */}
       <div className="scrollbar-minimal flex min-h-0 flex-1 flex-col gap-[18px] overflow-y-auto bg-panel-main px-4 py-5 sm:px-6">
-        {/* Hero frames — stack vertically on phones, side-by-side on ≥sm */}
-        <div className="relative flex flex-col items-center justify-center gap-3.5 sm:flex-row">
+        {/* Hero frames — always side-by-side so the prompt box is visible
+            without scrolling. Each frame shrinks to fill half the row. */}
+        <div className="relative flex items-center justify-center gap-2 sm:gap-3.5">
           <FrameTile label="START" frame={displayStart} accent="primary" />
           <button
             type="button"
@@ -264,14 +265,15 @@ export function VideoGenerationModal({
             className="min-h-[88px] w-full resize-none bg-transparent text-[15px] leading-snug text-foreground placeholder:text-[#acacac] focus:outline-none"
           />
 
-          {/* Pill row */}
-          <div className="flex h-9 items-center gap-2">
+          {/* Pill row — wraps on narrow screens so long model names don't
+              squeeze into a vertical jumble. */}
+          <div className="flex min-h-9 flex-wrap items-center gap-2">
             {/* MODEL pill */}
             <div className="relative" ref={modelPillRef}>
               <button
                 type="button"
                 onClick={() => setOpenPill((p) => (p === "model" ? null : "model"))}
-                className="flex h-8 cursor-pointer items-center gap-1.5 rounded-full border border-primary bg-primary-tint/50 px-3 transition-colors hover:bg-primary-tint"
+                className="flex h-8 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border border-primary bg-primary-tint/50 px-3 transition-colors hover:bg-primary-tint"
                 style={{ backgroundColor: "rgba(216, 230, 211, 0.45)" }}
               >
                 <span className="text-[10px] font-medium uppercase tracking-wider text-panel-muted">
@@ -326,7 +328,7 @@ export function VideoGenerationModal({
               <button
                 type="button"
                 onClick={() => setOpenPill((p) => (p === "res" ? null : "res"))}
-                className="flex h-8 cursor-pointer items-center gap-1.5 rounded-full border border-panel-border bg-panel-subtle px-3 transition-colors hover:bg-panel-chip"
+                className="flex h-8 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border border-panel-border bg-panel-subtle px-3 transition-colors hover:bg-panel-chip"
               >
                 <span className="text-[10px] font-medium uppercase tracking-wider text-panel-muted">
                   Res
@@ -367,7 +369,7 @@ export function VideoGenerationModal({
 
             {/* Duration locked chip */}
             <div
-              className="flex h-8 items-center gap-1.5 rounded-full border border-panel-border px-3"
+              className="flex h-8 items-center gap-1.5 whitespace-nowrap rounded-full border border-panel-border px-3"
               style={{ backgroundColor: "var(--color-panel-search)" }}
               title="Duration is fixed at 8s for first/last frame interpolation"
             >
@@ -409,7 +411,7 @@ export function VideoGenerationModal({
       <div
         className="flex h-[54px] shrink-0 items-center gap-2.5 border-t border-panel-border bg-panel-subtle px-4"
       >
-        <div className="flex min-w-0 items-center gap-1.5 text-[12px]">
+        <div className="flex min-w-0 items-center gap-1.5 whitespace-nowrap text-[12px]">
           <span className="font-medium text-panel-muted">Cost</span>
           <span className="font-semibold text-foreground">{cost} credits</span>
           <span className="hidden text-panel-muted sm:inline">·</span>
@@ -430,14 +432,15 @@ export function VideoGenerationModal({
           type="button"
           onClick={handleSubmit}
           disabled={submitting || insufficient}
-          className="flex h-[30px] cursor-pointer items-center gap-1.5 rounded-md bg-primary px-4 text-[12px] font-semibold text-white transition-colors hover:bg-primary-light disabled:cursor-not-allowed disabled:opacity-50"
+          title={insufficient ? `Need ${cost - credits} more credits` : `Generate video (${cost} credits)`}
+          className="flex h-[30px] cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-md bg-primary px-4 text-[12px] font-semibold text-white transition-colors hover:bg-primary-light disabled:cursor-not-allowed disabled:opacity-50"
         >
           <PlayIcon />
           {submitting
             ? "Starting…"
             : insufficient
               ? "Insufficient credits"
-              : `Generate Video (${cost} credits)`}
+              : "Generate Video"}
         </button>
       </div>
 
