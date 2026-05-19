@@ -436,13 +436,14 @@ function DockTab({
   onClick: () => void;
   accent?: boolean;
 }) {
-  const colorClass = isActive
-    ? accent
+  // The Generate tab (accent) is the primary CTA: solid green cell with white
+  // icon + label. Active state still gets the top indicator bar.
+  const colorClass = accent
+    ? "text-white"
+    : isActive
       ? "text-primary"
-      : "text-primary"
-    : accent
-      ? "text-primary-dark"
       : "text-muted-foreground";
+  const bgClass = accent ? "bg-primary" : "";
 
   return (
     <button
@@ -450,7 +451,7 @@ function DockTab({
       onClick={onClick}
       aria-label={label}
       aria-pressed={isActive}
-      className={`relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 transition-colors ${colorClass}`}
+      className={`relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 transition-colors ${colorClass} ${bgClass}`}
       data-tab={id}
     >
       <span className="relative h-5 w-5 shrink-0">
@@ -475,7 +476,7 @@ function DockTab({
       <span className="hidden max-w-full truncate text-[10px] font-semibold uppercase tracking-wider min-[340px]:block">
         {label}
       </span>
-      {isActive && (
+      {isActive && !accent && (
         <span className="absolute top-0 h-[3px] w-8 rounded-b-full bg-primary" />
       )}
     </button>

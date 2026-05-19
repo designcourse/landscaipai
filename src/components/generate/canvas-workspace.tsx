@@ -213,6 +213,10 @@ export function CanvasWorkspace({
   const [selectionOrder, setSelectionOrder] = useState<string[]>([]);
   // Counter that fires the mobile dock to open the Prompt panel after an upload.
   const [openPromptSignal, setOpenPromptSignal] = useState(0);
+  // Shared signal: true while a two-finger pinch gesture is active. InfiniteCanvas
+  // writes to this ref; image cards read it to stop their own drag/resize math
+  // so pinch-zoom-over-a-card works correctly.
+  const pinchActiveRef = useRef(false);
 
   // Video generation state
   const [videoModalOpen, setVideoModalOpen] = useState(false);
@@ -1539,6 +1543,7 @@ export function CanvasWorkspace({
           positions={positions}
           canvasItems={canvasItems}
           onMarqueeSelect={handleMarqueeSelect}
+          pinchActiveRef={pinchActiveRef}
         >
           {canvasItems.map((item) => {
             const pos = positions[item.id];
@@ -1562,6 +1567,7 @@ export function CanvasWorkspace({
                 onRequestFinalize={(videoGenerationId) =>
                   setFinalizeVideoId(videoGenerationId)
                 }
+                pinchActiveRef={pinchActiveRef}
               />
             );
           })}

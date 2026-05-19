@@ -20,6 +20,10 @@ interface InfiniteCanvasProps {
   positions: Record<string, ItemPosition>;
   canvasItems: CanvasItem[];
   onMarqueeSelect: (ids: string[]) => void;
+  // Shared ref that signals a two-finger pinch is in progress. The canvas sets
+  // this so image cards can short-circuit their own drag math while pinch is
+  // active (otherwise pinch on top of a card would fight with card drag).
+  pinchActiveRef: React.RefObject<boolean>;
   children: ReactNode;
 }
 
@@ -56,6 +60,7 @@ export function InfiniteCanvas({
   positions,
   canvasItems,
   onMarqueeSelect,
+  pinchActiveRef,
   children,
 }: InfiniteCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -321,8 +326,87 @@ export function InfiniteCanvas({
   function handlePointerCancelLocal(e: React.PointerEvent) {
     if (e.pointerType === "touch") {
       activeTouchesRef.current.delete(e.pointerId);
-      if (activeTouchesRef.current.size < 2) pinchRef.current = null;
+      if (activeTouchesRef.current.size < 2) {
+        pinchRef.current = null;
+        pinchActiveRef.current = false;
+      }
       if (activeTouchesRef.current.size === 0) touchPanRef.current = null;
+    }
+  }
+
+  // ---- Capture-phase touch tracking ----
+  // Image cards stopPropagation on their own pointerdown to handle drag without
+  // also panning. That means the bubble-phase canvas handler never sees the
+  // touch, so when a user puts their second finger down on a card we'd miss
+  // the pinch-promotion entirely. Capture phase runs BEFORE children, so we
+  // can record every touch regardless of where it landed and run the pinch
+  // math from here. `pinchActiveRef` then tells the cards to stop dragging
+  // for the duration of the gesture.
+  function handlePointerDownCaptureLocal(e: React.PointerEvent) {
+    if (e.pointerType !== "touch") return;
+    activeTouchesRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (activeTouchesRef.current.size === 2) {
+      touchPanRef.current = null;
+      isMarqueeActive.current = false;
+      setMarquee(null);
+
+      const points = Array.from(activeTouchesRef.current.values());
+      const dx = points[0].x - points[1].x;
+      const dy = points[0].y - points[1].y;
+      const dist = Math.hypot(dx, dy) || 1;
+      const centerScreenX = (points[0].x + points[1].x) / 2;
+      const centerScreenY = (points[0].y + points[1].y) / 2;
+      const center = screenToCanvas(centerScreenX, centerScreenY);
+
+      pinchRef.current = {
+        startDist: dist,
+        startZoom: viewport.zoom,
+        startPanX: viewport.panX,
+        startPanY: viewport.panY,
+        startCenterCanvasX: center.x,
+        startCenterCanvasY: center.y,
+      };
+      pinchActiveRef.current = true;
+    }
+  }
+
+  function handlePointerMoveCaptureLocal(e: React.PointerEvent) {
+    if (e.pointerType !== "touch") return;
+    if (!activeTouchesRef.current.has(e.pointerId)) return;
+    activeTouchesRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (pinchRef.current && activeTouchesRef.current.size >= 2) {
+      const points = Array.from(activeTouchesRef.current.values()).slice(0, 2);
+      const dx = points[0].x - points[1].x;
+      const dy = points[0].y - points[1].y;
+      const dist = Math.hypot(dx, dy) || 1;
+
+      const centerScreenX = (points[0].x + points[1].x) / 2;
+      const centerScreenY = (points[0].y + points[1].y) / 2;
+      const container = containerRef.current;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      const screenX = centerScreenX - rect.left;
+      const screenY = centerScreenY - rect.top;
+
+      const scale = dist / pinchRef.current.startDist;
+      const newZoom = clamp(
+        pinchRef.current.startZoom * scale,
+        MIN_ZOOM,
+        MAX_ZOOM
+      );
+      const newPanX = screenX / newZoom - pinchRef.current.startCenterCanvasX;
+      const newPanY = screenY / newZoom - pinchRef.current.startCenterCanvasY;
+      setViewport({ zoom: newZoom, panX: newPanX, panY: newPanY });
+    }
+  }
+
+  function handlePointerUpCaptureLocal(e: React.PointerEvent) {
+    if (e.pointerType !== "touch") return;
+    activeTouchesRef.current.delete(e.pointerId);
+    if (activeTouchesRef.current.size < 2 && pinchRef.current) {
+      pinchRef.current = null;
+      pinchActiveRef.current = false;
     }
   }
 
@@ -366,6 +450,9 @@ export function InfiniteCanvas({
       onPointerMove={handlePointerMoveLocal}
       onPointerUp={handlePointerUpLocal}
       onPointerCancel={handlePointerCancelLocal}
+      onPointerDownCapture={handlePointerDownCaptureLocal}
+      onPointerMoveCapture={handlePointerMoveCaptureLocal}
+      onPointerUpCapture={handlePointerUpCaptureLocal}
       data-canvas-bg="true"
     >
       <div

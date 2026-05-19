@@ -162,6 +162,28 @@ export function CanvasMobileToolbar({
         <span className="text-xs font-medium text-primary">{credits}</span>
       </button>
 
+      {/* Upload — primary action, surfaced out of the kebab so users can
+          find it without having to dig through the menu */}
+      <button
+        type="button"
+        onClick={() => {
+          if (credits <= 0) {
+            openPurchaseCredits({
+              title: "You're out of credits",
+              subtitle: "Buy credits to upload a new photo and keep designing.",
+            });
+            return;
+          }
+          onUpload();
+        }}
+        aria-label="Upload photo"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary text-white transition-colors hover:bg-primary-light"
+      >
+        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v12m0-12l-4 4m4-4l4 4M5 20h14" />
+        </svg>
+      </button>
+
       {/* Kebab menu */}
       <div className="relative" ref={kebabMenuRef}>
         <button

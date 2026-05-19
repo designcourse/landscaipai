@@ -43,6 +43,9 @@ interface CanvasImageCardProps {
   onLibraryTagClick?: (tagId: string) => void;
   /** Triggered when user clicks "Finalize Video" on a video card. */
   onRequestFinalize?: (videoGenerationId: string) => void;
+  /** Set by InfiniteCanvas while a two-finger pinch is in progress so the
+   *  card can skip its own drag/resize math (pinch wins over card drag). */
+  pinchActiveRef: React.RefObject<boolean>;
 }
 
 const RESIZE_HANDLE_SIZE = 10;
@@ -60,6 +63,7 @@ export const CanvasImageCard = memo(function CanvasImageCard({
   onRequestDelete,
   onLibraryTagClick,
   onRequestFinalize,
+  pinchActiveRef,
 }: CanvasImageCardProps) {
   const [hovered, setHovered] = useState(false);
   const [revealed, setRevealed] = useState(false);
@@ -76,6 +80,9 @@ export const CanvasImageCard = memo(function CanvasImageCard({
     (e: React.PointerEvent) => {
       if (isSpaceDown.current) return; // Let pan handler take over
       if ((e.target as HTMLElement).dataset.resizeHandle) return; // Resize handle
+      // A two-finger pinch is already in progress — let the canvas handle
+      // this new pointer for pinch tracking, don't start a drag.
+      if (pinchActiveRef.current) return;
 
       e.stopPropagation();
       onSelect(item.id, e);
@@ -89,11 +96,22 @@ export const CanvasImageCard = memo(function CanvasImageCard({
       };
       (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
     },
-    [item.id, position.x, position.y, onSelect, isSpaceDown]
+    [item.id, position.x, position.y, onSelect, isSpaceDown, pinchActiveRef]
   );
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
+      // Two-finger pinch wins over single-finger drag/resize. Clear the local
+      // drag state so we don't snap to a stale position when the gesture ends.
+      if (pinchActiveRef.current) {
+        if (isDragging.current || isResizing.current) {
+          isDragging.current = false;
+          isResizing.current = false;
+          dragStart.current = null;
+          resizeStart.current = null;
+        }
+        return;
+      }
       if (isDragging.current && dragStart.current) {
         const dx = (e.clientX - dragStart.current.x) / zoom;
         const dy = (e.clientY - dragStart.current.y) / zoom;
@@ -109,7 +127,7 @@ export const CanvasImageCard = memo(function CanvasImageCard({
         onPositionChange(item.id, { width: newWidth, height: newHeight });
       }
     },
-    [item.id, zoom, aspect, onPositionChange]
+    [item.id, zoom, aspect, onPositionChange, pinchActiveRef]
   );
 
   const handlePointerUp = useCallback(() => {
@@ -304,9 +322,9 @@ export const CanvasImageCard = memo(function CanvasImageCard({
           </div>
         )}
 
-        {/* Selection outline */}
+        {/* Selection outline — thicker on mobile (touch targets need to be obvious) */}
         {selected && (
-          <div className="pointer-events-none absolute inset-0 rounded-md border-2 border-blue-500" />
+          <div className="pointer-events-none absolute inset-0 rounded-md border-[10px] border-blue-500 lg:border-2" />
         )}
 
         {/* Finalized badge — small glass pill in the top-left of the video */}
