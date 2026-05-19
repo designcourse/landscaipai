@@ -23,6 +23,14 @@ import {
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
+// Veo 3.1 first/last-frame interpolation locks duration at 8s. Kept at module
+// scope because Turbopack (Next.js 16) was incorrectly eliminating a
+// function-local `const durationSeconds = 8` whose references all looked like
+// shorthand object props (`{ durationSeconds }`) — at runtime the references
+// then threw `ReferenceError: durationSeconds is not defined`. A module-level
+// const is never elided, which sidesteps the bug entirely.
+const VIDEO_DURATION_SECONDS = 8;
+
 // Frame source can be either an original upload or a prior generation
 interface FrameSource {
   kind: "image" | "generation";
@@ -206,8 +214,11 @@ export async function POST(request: NextRequest) {
     }
 
     // 6. Compute cost + build prompt
-    const durationSeconds = 8; // Veo 3.1 requires 8s for first+last frame interpolation
-    const cost = computeCreditCost({ modelId, durationSeconds, resolution });
+    const cost = computeCreditCost({
+      modelId,
+      durationSeconds: VIDEO_DURATION_SECONDS,
+      resolution,
+    });
     const motionPrompt = buildVideoPrompt({
       cameraPresetId,
       transitionPresetId,
@@ -226,7 +237,7 @@ export async function POST(request: NextRequest) {
         end_image_id: endFrame.kind === "image" ? endFrame.id : null,
         end_generation_id: endFrame.kind === "generation" ? endFrame.id : null,
         model: modelOption.apiModel,
-        duration_seconds: durationSeconds,
+        duration_seconds: VIDEO_DURATION_SECONDS,
         resolution,
         aspect_ratio: aspectRatio,
         camera_preset: cameraPresetId,
@@ -253,7 +264,7 @@ export async function POST(request: NextRequest) {
     // 8. Deduct credits atomically
     const deducted = await deductCredits(user.id, cost, {
       videoGenerationId,
-      description: `Video generation (${modelOption.name}, ${durationSeconds}s, ${resolution})`,
+      description: `Video generation (${modelOption.name}, ${VIDEO_DURATION_SECONDS}s, ${resolution})`,
     });
     if (!deducted) {
       await admin
@@ -350,7 +361,7 @@ export async function POST(request: NextRequest) {
         id: videoGenerationId,
         status: "processing",
         model: modelOption.apiModel,
-        duration_seconds: durationSeconds,
+        duration_seconds: VIDEO_DURATION_SECONDS,
         resolution,
         camera_preset: cameraPresetId,
         transition_preset: transitionPresetId,
