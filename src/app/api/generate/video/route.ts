@@ -267,6 +267,12 @@ export async function POST(request: NextRequest) {
     }
 
     // 9. Kick off the Veo long-running operation
+    //
+    // NB: `durationSeconds` is intentionally NOT passed when both `image` and
+    // `config.lastFrame` are provided. Veo 3.1 first/last frame interpolation
+    // enforces an implicit 8-second duration, and the API now responds with
+    // "durationSeconds is not defined" if you try to set it explicitly in
+    // that mode. The 8s is still recorded in our DB row above for accounting.
     let operation;
     try {
       operation = await ai.models.generateVideos({
@@ -281,7 +287,6 @@ export async function POST(request: NextRequest) {
             imageBytes: endData.base64,
             mimeType: endData.mimeType,
           },
-          durationSeconds,
           resolution: resolution === "1080p" ? "1080p" : "720p",
           aspectRatio,
           numberOfVideos: 1,
