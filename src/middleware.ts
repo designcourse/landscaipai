@@ -5,7 +5,21 @@ const protectedRoutes = ["/dashboard", "/project", "/generate", "/account", "/re
 const adminRoutes = ["/admin"];
 const authRoutes = ["/login", "/signup"];
 
+const CANONICAL_HOST = "landscaip.co";
+
 export async function middleware(request: NextRequest) {
+  // Force canonical host: 308-redirect anything served from the *.vercel.app
+  // preview URL (or www subdomain) to the primary domain. Keeps OAuth and
+  // installed-PWA origins coherent.
+  const host = request.headers.get("host") ?? "";
+  if (host === "landscaipai-2026.vercel.app" || host === `www.${CANONICAL_HOST}`) {
+    const url = new URL(request.url);
+    url.host = CANONICAL_HOST;
+    url.protocol = "https:";
+    url.port = "";
+    return NextResponse.redirect(url, 308);
+  }
+
   let response = NextResponse.next({ request });
 
   // Skip auth checks if Supabase is not configured
