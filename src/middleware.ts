@@ -12,7 +12,7 @@ export async function middleware(request: NextRequest) {
   // preview URL (or www subdomain) to the primary domain. Keeps OAuth and
   // installed-PWA origins coherent.
   const host = request.headers.get("host") ?? "";
-  if (host === "landscaipai-2026.vercel.app" || host === `www.${CANONICAL_HOST}`) {
+  if (host === "landscaipai-2026.vercel.app") {
     const url = new URL(request.url);
     url.host = CANONICAL_HOST;
     url.protocol = "https:";
