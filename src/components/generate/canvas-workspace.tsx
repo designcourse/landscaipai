@@ -14,6 +14,7 @@ import {
 } from "@/lib/gemini/prompts";
 import { InfiniteCanvas } from "./infinite-canvas";
 import { CanvasImageCard, type CanvasItem } from "./canvas-image-card";
+import { MobileVideoFramePicker } from "./mobile-video-frame-picker";
 import { CanvasToolbar } from "./canvas-toolbar";
 import { CanvasBottomBar } from "./canvas-bottom-bar";
 import { CanvasMobileToolbar } from "./canvas-mobile-toolbar";
@@ -220,6 +221,10 @@ export function CanvasWorkspace({
 
   // Video generation state
   const [videoModalOpen, setVideoModalOpen] = useState(false);
+  // Mobile-only: when true the frame-picker sheet is open. Tapping the
+  // selection bar's "Video" button sets this; confirming the picker writes
+  // selection state in start→end order and opens the video modal.
+  const [videoPickerOpen, setVideoPickerOpen] = useState(false);
   const [videoSubmitting, setVideoSubmitting] = useState(false);
   const [videoError, setVideoError] = useState<string | null>(null);
 
@@ -1680,6 +1685,9 @@ export function CanvasWorkspace({
             onRequestDelete={
               primarySelectedId ? () => handleRequestDelete(primarySelectedId) : undefined
             }
+            onOpenVideoPicker={
+              primarySelectedId ? () => setVideoPickerOpen(true) : undefined
+            }
             openPromptSignal={openPromptSignal}
           />
         ) : (
@@ -1732,6 +1740,24 @@ export function CanvasWorkspace({
           imageUrl={inpaintImageUrl}
           onConfirm={handleMaskConfirm}
           onCancel={handleMaskCancel}
+        />
+      )}
+
+      {/* Mobile video frame picker — sets selection in start→end order then
+          opens the existing video modal so the rest of the pipeline is shared. */}
+      {videoPickerOpen && (
+        <MobileVideoFramePicker
+          items={canvasItems}
+          initialStartId={primarySelectedId}
+          onCancel={() => setVideoPickerOpen(false)}
+          onConfirm={(startId, endId) => {
+            setSelectedItemIds(new Set([startId, endId]));
+            setSelectionOrder([startId, endId]);
+            setPrimarySelectedId(startId);
+            setVideoPickerOpen(false);
+            setVideoError(null);
+            setVideoModalOpen(true);
+          }}
         />
       )}
 

@@ -42,6 +42,9 @@ interface CanvasMobileDockProps {
   // Mobile-only callbacks (resolved against the primary selection at the workspace level)
   onEditRegion?: () => void;
   onRequestDelete?: () => void;
+  /** Mobile-only: opens the frame picker sheet for video generation. The
+   *  picker pre-fills the currently-selected image as the start frame. */
+  onOpenVideoPicker?: () => void;
   // Imperative signal: when this number changes, open the Prompt tab. Workspace
   // increments it after a mobile upload completes so the user lands in the
   // prompt panel with their just-uploaded photo selected.
@@ -225,16 +228,17 @@ export function CanvasMobileDock(props: CanvasMobileDockProps) {
                   </svg>
                 </button>
               )}
-              {props.videoButtonState === "enabled" && (
+              {props.onOpenVideoPicker && (
                 <button
-                  onClick={props.onOpenVideoModal}
-                  className="flex h-9 w-9 items-center justify-center rounded-md text-foreground transition-colors hover:bg-muted"
-                  aria-label="Generate video"
-                  title="Generate video"
+                  onClick={props.onOpenVideoPicker}
+                  className="flex h-9 items-center gap-1 rounded-md px-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                  aria-label="Make video"
+                  title="Make video"
                 >
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                   </svg>
+                  <span>Video</span>
                 </button>
               )}
               {props.onRequestDelete && (
