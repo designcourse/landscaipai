@@ -357,9 +357,13 @@ export async function POST(request: NextRequest) {
       credits_remaining: profile?.credits_balance ?? 0,
     });
   } catch (err) {
-    console.error("Video generation error:", err);
+    // Surface the real message + stack so the client + logs show something
+    // actionable instead of a flat "Internal server error".
+    const message = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error ? err.stack : undefined;
+    console.error("Video generation error:", message, stack);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: `Video generation failed: ${message}` },
       { status: 500 }
     );
   }
