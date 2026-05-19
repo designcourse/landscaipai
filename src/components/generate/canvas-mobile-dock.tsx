@@ -42,6 +42,10 @@ interface CanvasMobileDockProps {
   // Mobile-only callbacks (resolved against the primary selection at the workspace level)
   onEditRegion?: () => void;
   onRequestDelete?: () => void;
+  // Imperative signal: when this number changes, open the Prompt tab. Workspace
+  // increments it after a mobile upload completes so the user lands in the
+  // prompt panel with their just-uploaded photo selected.
+  openPromptSignal?: number;
 }
 
 type Tab = "style" | "settings" | "library" | "prompt" | "generate";
@@ -80,20 +84,21 @@ const IMAGE_MODEL_OPTIONS: { id: "gemini" | "gemini-pro" | "openai"; label: stri
 export function CanvasMobileDock(props: CanvasMobileDockProps) {
   const [activeTab, setActiveTab] = useState<Tab>("prompt");
   const [panelOpen, setPanelOpen] = useState(false);
-  const [modelMenuOpen, setModelMenuOpen] = useState(false);
 
   const attachmentInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const modelMenuRef = useRef<HTMLDivElement>(null);
+  // Model picker UI is hidden — image model is locked to "gemini" by the
+  // workspace. Keep props on the interface so we can re-enable the picker
+  // later without rewiring.
+  void props.imageModel;
+  void props.onImageModelChange;
 
+  // Open Prompt panel when the parent fires the signal (post-upload on mobile).
   useEffect(() => {
-    if (!modelMenuOpen) return;
-    function onDown(e: PointerEvent) {
-      if (!modelMenuRef.current?.contains(e.target as Node)) setModelMenuOpen(false);
-    }
-    document.addEventListener("pointerdown", onDown);
-    return () => document.removeEventListener("pointerdown", onDown);
-  }, [modelMenuOpen]);
+    if (props.openPromptSignal === undefined || props.openPromptSignal === 0) return;
+    setActiveTab("prompt");
+    setPanelOpen(true);
+  }, [props.openPromptSignal]);
 
   function handleTabClick(tab: Tab) {
     if (tab === "library") {
@@ -292,11 +297,6 @@ export function CanvasMobileDock(props: CanvasMobileDockProps) {
                 onRemoveLibraryItem={props.onRemoveLibraryItem}
                 onLibraryItemClick={props.onLibraryItemClick}
                 shortenName={shortenName}
-                imageModel={props.imageModel}
-                onImageModelChange={props.onImageModelChange}
-                modelMenuOpen={modelMenuOpen}
-                setModelMenuOpen={setModelMenuOpen}
-                modelMenuRef={modelMenuRef}
               />
             )}
             {activeTab === "generate" && (
@@ -326,7 +326,7 @@ export function CanvasMobileDock(props: CanvasMobileDockProps) {
           <DockTab
             id="style"
             label="Style"
-            badge={selectedPreset ? "\u2022" : null}
+            configured={!!selectedPreset}
             isActive={activeTab === "style" && panelOpen}
             onClick={() => handleTabClick("style")}
             icon={
@@ -342,7 +342,7 @@ export function CanvasMobileDock(props: CanvasMobileDockProps) {
           <DockTab
             id="settings"
             label="Settings"
-            badge={props.timeOfDay || props.season || props.weather ? "\u2022" : null}
+            configured={!!(props.timeOfDay || props.season || props.weather)}
             isActive={activeTab === "settings" && panelOpen}
             onClick={() => handleTabClick("settings")}
             icon={
@@ -372,7 +372,7 @@ export function CanvasMobileDock(props: CanvasMobileDockProps) {
           <DockTab
             id="prompt"
             label="Prompt"
-            badge={props.customPrompt.trim() ? "\u2022" : null}
+            configured={!!props.customPrompt.trim()}
             isActive={activeTab === "prompt" && panelOpen}
             onClick={() => handleTabClick("prompt")}
             icon={
@@ -388,9 +388,22 @@ export function CanvasMobileDock(props: CanvasMobileDockProps) {
             onClick={() => handleTabClick("generate")}
             accent
             icon={
-              <svg viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2L14.09 8.26L20 9.27L15.55 13.97L16.91 20L12 16.9L7.09 20L8.45 13.97L4 9.27L9.91 8.26L12 2Z" />
-              </svg>
+              // Leaf mark recolored via CSS mask so it inherits the dock-tab text color.
+              <span
+                aria-hidden
+                className="block h-full w-full"
+                style={{
+                  backgroundColor: "currentColor",
+                  WebkitMaskImage: "url(/icons/leaf-mark-white.png)",
+                  maskImage: "url(/icons/leaf-mark-white.png)",
+                  WebkitMaskSize: "contain",
+                  maskSize: "contain",
+                  WebkitMaskRepeat: "no-repeat",
+                  maskRepeat: "no-repeat",
+                  WebkitMaskPosition: "center",
+                  maskPosition: "center",
+                }}
+              />
             }
           />
         </div>
@@ -407,6 +420,7 @@ function DockTab({
   label,
   icon,
   badge,
+  configured,
   isActive,
   onClick,
   accent,
@@ -414,7 +428,10 @@ function DockTab({
   id: string;
   label: string;
   icon: React.ReactNode;
+  /** Numeric/text badge (e.g. selected-item count). Takes precedence over `configured`. */
   badge?: string | null;
+  /** True when the tab has any value set — shows a white checkmark in a green dot. */
+  configured?: boolean;
   isActive: boolean;
   onClick: () => void;
   accent?: boolean;
@@ -438,13 +455,22 @@ function DockTab({
     >
       <span className="relative h-5 w-5 shrink-0">
         {icon}
-        {badge && (
+        {badge ? (
           <span
             className="absolute -right-1.5 -top-1 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-white"
           >
             {badge}
           </span>
-        )}
+        ) : configured ? (
+          <span
+            className="absolute -right-1.5 -top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-primary"
+            aria-hidden
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={4} className="h-2.5 w-2.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          </span>
+        ) : null}
       </span>
       <span className="hidden max-w-full truncate text-[10px] font-semibold uppercase tracking-wider min-[340px]:block">
         {label}
@@ -606,11 +632,6 @@ function PromptPanel({
   onRemoveLibraryItem,
   onLibraryItemClick,
   shortenName,
-  imageModel,
-  onImageModelChange,
-  modelMenuOpen,
-  setModelMenuOpen,
-  modelMenuRef,
 }: {
   customPrompt: string;
   onCustomPromptChange: (v: string) => void;
@@ -626,15 +647,8 @@ function PromptPanel({
   onRemoveLibraryItem: (id: string) => void;
   onLibraryItemClick: (id: string) => void;
   shortenName: (name: string, max?: number) => string;
-  imageModel: "gemini" | "gemini-pro" | "openai";
-  onImageModelChange: (model: "gemini" | "gemini-pro" | "openai") => void;
-  modelMenuOpen: boolean;
-  setModelMenuOpen: (open: boolean) => void;
-  modelMenuRef: React.RefObject<HTMLDivElement | null>;
 }) {
   const hasExtras = attachments.length > 0 || selectedLibraryItems.length > 0;
-  const currentModel =
-    IMAGE_MODEL_OPTIONS.find((o) => o.id === imageModel)?.label ?? imageModel;
 
   return (
     <div className="flex flex-col gap-2 p-3">
@@ -729,61 +743,6 @@ function PromptPanel({
             </span>
           )}
         </button>
-
-        <div ref={modelMenuRef} className="relative">
-          <button
-            type="button"
-            onClick={() => setModelMenuOpen(!modelMenuOpen)}
-            className="flex h-9 items-center gap-1.5 rounded-md border border-border px-2.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
-            aria-label={`AI model: ${currentModel}`}
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            <span className="max-w-[88px] truncate">{currentModel}</span>
-          </button>
-
-          {modelMenuOpen && (
-            <div className="absolute bottom-full left-0 mb-2 w-64 overflow-hidden rounded-lg border border-border bg-white shadow-lg">
-              <div className="border-b border-border px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                AI Model
-              </div>
-              {IMAGE_MODEL_OPTIONS.map((opt) => {
-                const selected = imageModel === opt.id;
-                return (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => {
-                      onImageModelChange(opt.id);
-                      setModelMenuOpen(false);
-                    }}
-                    className={`flex w-full items-start gap-2 px-3 py-2.5 text-left transition-colors ${
-                      selected ? "bg-primary/10" : "hover:bg-muted"
-                    }`}
-                  >
-                    <span className="mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center">
-                      {selected ? (
-                        <svg className="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      ) : (
-                        <span className="h-3 w-3 rounded-full border border-border" />
-                      )}
-                    </span>
-                    <span className="flex flex-col">
-                      <span className={`text-sm font-medium ${selected ? "text-primary" : "text-foreground"}`}>
-                        {opt.label}
-                      </span>
-                      <span className="text-xs text-muted-foreground">{opt.description}</span>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
       </div>
     </div>
   );
@@ -839,9 +798,13 @@ function GeneratePanel({
         disabled={!canGenerate}
         className="flex h-12 w-full items-center justify-center gap-2 rounded-md bg-primary text-base font-semibold text-white transition-colors hover:bg-primary-light disabled:opacity-50"
       >
-        <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M12 2L14.09 8.26L20 9.27L15.55 13.97L16.91 20L12 16.9L7.09 20L8.45 13.97L4 9.27L9.91 8.26L12 2Z" />
-        </svg>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/icons/leaf-mark-white.png"
+          alt=""
+          aria-hidden
+          className="h-6 w-6"
+        />
         {generating ? "Generating..." : "Generate"}
         <span className="font-medium" style={{ color: "#95f788" }}>
           (1 credit)

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import {
   STYLE_PRESETS,
   TIME_OF_DAY_OPTIONS,
@@ -124,21 +124,14 @@ export function CanvasBottomBar({
 }: CanvasBottomBarProps) {
   const [styleDropdownOpen, setStyleDropdownOpen] = useState(false);
   const [promptFocused, setPromptFocused] = useState(false);
-  const [modelMenuOpen, setModelMenuOpen] = useState(false);
   const styleDropdownRef = useRef<HTMLDivElement>(null);
-  const modelMenuRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
-
-  // Close model menu on outside click
-  useEffect(() => {
-    if (!modelMenuOpen) return;
-    function onDown(e: MouseEvent) {
-      if (!modelMenuRef.current?.contains(e.target as Node)) setModelMenuOpen(false);
-    }
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [modelMenuOpen]);
+  // Model picker UI is currently hidden — `imageModel` is locked to "gemini"
+  // by the workspace. Keep all model props/wiring intact so we can flip the
+  // picker back on later without rewiring.
+  void imageModel;
+  void onImageModelChange;
 
   // When promptCollapsed is set externally, blur the textarea
   const promptExpanded = promptFocused && !promptCollapsed;
@@ -401,7 +394,7 @@ export function CanvasBottomBar({
                 onBlur={() => setPromptFocused(false)}
                 onPaste={handlePaste}
                 placeholder={hasMask ? "Describe what to change in the masked area..." : "Custom instructions (Ctrl+V to paste images)"}
-                className="w-full resize-none rounded-[10px] border py-2 pl-3.5 pr-9 text-base text-foreground placeholder:text-[#74716d] focus:outline-none"
+                className="w-full resize-none rounded-[10px] border py-2 px-3.5 text-base text-foreground placeholder:text-[#74716d] focus:outline-none"
                 style={{
                   backgroundColor: "var(--color-canvas-input-bg)",
                   borderColor: "var(--color-canvas-input-border)",
@@ -412,66 +405,6 @@ export function CanvasBottomBar({
                 }}
                 rows={1}
               />
-
-              {/* AI model picker (gear icon) */}
-              <div ref={modelMenuRef} className="absolute right-1.5 top-1.5">
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => setModelMenuOpen((v) => !v)}
-                  className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                  title={`AI model: ${IMAGE_MODEL_OPTIONS.find((o) => o.id === imageModel)?.label ?? imageModel}`}
-                  aria-label="Select AI model"
-                >
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                </button>
-
-                {modelMenuOpen && (
-                  <div
-                    className="absolute bottom-full right-0 mb-2 w-64 overflow-hidden rounded-lg border border-border bg-white shadow-lg"
-                    onMouseDown={(e) => e.stopPropagation()}
-                  >
-                    <div className="border-b border-border px-3 py-2 text-xs font-medium text-muted-foreground">
-                      AI Model
-                    </div>
-                    {IMAGE_MODEL_OPTIONS.map((opt) => {
-                      const selected = imageModel === opt.id;
-                      return (
-                        <button
-                          key={opt.id}
-                          type="button"
-                          onClick={() => {
-                            onImageModelChange(opt.id);
-                            setModelMenuOpen(false);
-                          }}
-                          className={`flex w-full items-start gap-2 px-3 py-2 text-left transition-colors ${
-                            selected ? "bg-primary/10" : "hover:bg-muted"
-                          }`}
-                        >
-                          <span className="mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center">
-                            {selected ? (
-                              <svg className="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                              </svg>
-                            ) : (
-                              <span className="h-3 w-3 rounded-full border border-border" />
-                            )}
-                          </span>
-                          <span className="flex flex-col">
-                            <span className={`text-sm font-medium ${selected ? "text-primary" : "text-foreground"}`}>
-                              {opt.label}
-                            </span>
-                            <span className="text-xs text-muted-foreground">{opt.description}</span>
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
             </div>
           </div>
 
@@ -535,25 +468,23 @@ export function CanvasBottomBar({
           )}
         </div>
 
-        {/* Generate CTA — unchanged below */}
+        {/* Generate CTA — primary green container so it reads as THE primary action */}
         <div
-          className="flex items-center justify-center overflow-hidden rounded-[20px] px-[11px] py-3"
-          style={{
-            backgroundColor: "var(--color-canvas-card-bg)",
-            boxShadow: "var(--shadow-toolbar)",
-          }}
+          className="flex items-center justify-center overflow-hidden rounded-[20px] bg-primary px-[11px] py-3 transition-colors hover:bg-primary-light"
+          style={{ boxShadow: "var(--shadow-toolbar)" }}
         >
           <button
             onClick={onGenerate}
             disabled={generating || credits < 1 || !hasSelection}
-            className="flex h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-[10px] bg-primary px-5 py-2.5 text-base font-semibold text-white transition-colors hover:bg-primary-light disabled:opacity-50"
+            className="flex h-10 items-center justify-center gap-1.5 whitespace-nowrap px-5 py-2.5 text-base font-semibold text-white disabled:opacity-50"
           >
-            <svg className="h-[19px] w-[19px]" fill="none" viewBox="0 0 24 24">
-              <path
-                d="M12 2L14.09 8.26L20 9.27L15.55 13.97L16.91 20L12 16.9L7.09 20L8.45 13.97L4 9.27L9.91 8.26L12 2Z"
-                fill="currentColor"
-              />
-            </svg>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/icons/leaf-mark-white.png"
+              alt=""
+              aria-hidden
+              className="h-[22px] w-[22px]"
+            />
             {generating ? (
               "Generating..."
             ) : (

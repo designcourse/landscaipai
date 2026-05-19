@@ -10,6 +10,7 @@
  *   - icon-512-maskable.png   (Android adaptive icons, extra padding in safe zone)
  *   - apple-touch-icon.png    (iOS home screen, 180x180)
  *   - favicon-32.png          (browser tab)
+ *   - leaf-mark-white.png     (bare white mark on transparent, 128x128 — for UI use)
  *
  * Usage:
  *   npx tsx scripts/generate-pwa-icons.ts
@@ -114,6 +115,36 @@ async function main() {
   // Safe zone is the inner 80% — so we need ~20% padding on all sides (40% total).
   // Source spec: https://web.dev/maskable-icon/
   await makeIcon(512, 0.22, path.join(OUT_DIR, "icon-512-maskable.png"), leaf);
+
+  // Bare white mark on transparent — for UI use (e.g., Generate button).
+  // Resize the trimmed leaf to fit a 128x128 square with no background, preserving aspect ratio.
+  const markSize = 128;
+  const scaleW = markSize / leaf.width;
+  const scaleH = markSize / leaf.height;
+  const scale = Math.min(scaleW, scaleH);
+  const markW = Math.round(leaf.width * scale);
+  const markH = Math.round(leaf.height * scale);
+  await sharp({
+    create: {
+      width: markSize,
+      height: markSize,
+      channels: 4,
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    },
+  })
+    .composite([
+      {
+        input: await sharp(leaf.buffer)
+          .resize(markW, markH, { kernel: sharp.kernel.lanczos3 })
+          .png()
+          .toBuffer(),
+        left: Math.round((markSize - markW) / 2),
+        top: Math.round((markSize - markH) / 2),
+      },
+    ])
+    .png()
+    .toFile(path.join(OUT_DIR, "leaf-mark-white.png"));
+  console.log(`  leaf-mark-white.png (${markSize}×${markSize}, white on transparent)`);
 
   console.log("\nDone. Icons written to public/icons/");
 }

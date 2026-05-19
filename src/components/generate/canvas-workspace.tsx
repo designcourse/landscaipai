@@ -211,6 +211,8 @@ export function CanvasWorkspace({
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
   // Parallel ordered list to preserve selection order (first = start frame for video)
   const [selectionOrder, setSelectionOrder] = useState<string[]>([]);
+  // Counter that fires the mobile dock to open the Prompt panel after an upload.
+  const [openPromptSignal, setOpenPromptSignal] = useState(0);
 
   // Video generation state
   const [videoModalOpen, setVideoModalOpen] = useState(false);
@@ -1452,6 +1454,12 @@ export function CanvasWorkspace({
       const panY = -newY + (rect.height / 2) / viewport.zoom - height / 2;
       setViewport({ ...viewport, panX, panY });
     }
+
+    // On mobile, surface the Prompt panel automatically so the user can
+    // start describing what they want without hunting for the dock tab.
+    if (isMobile) {
+      setOpenPromptSignal((n) => n + 1);
+    }
   }
 
   function handleUploadClick() {
@@ -1667,6 +1675,7 @@ export function CanvasWorkspace({
             onRequestDelete={
               primarySelectedId ? () => handleRequestDelete(primarySelectedId) : undefined
             }
+            openPromptSignal={openPromptSignal}
           />
         ) : (
           <CanvasBottomBar

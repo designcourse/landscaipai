@@ -146,9 +146,12 @@ export function PlantBrowser({
         onSelectionChange(selectedItems.filter((i) => i.id !== item.id));
       } else {
         onSelectionChange([...selectedItems, item]);
+        // Close the library after adding — user wants to get back to the
+        // canvas to keep designing, not stay in the browse list.
+        onClose();
       }
     },
-    [selectedIds, selectedItems, onSelectionChange],
+    [selectedIds, selectedItems, onSelectionChange, onClose],
   );
 
   // Filtered items.
