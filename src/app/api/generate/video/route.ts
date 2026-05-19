@@ -362,13 +362,23 @@ export async function POST(request: NextRequest) {
       credits_remaining: profile?.credits_balance ?? 0,
     });
   } catch (err) {
-    // Surface the real message + stack so the client + logs show something
-    // actionable instead of a flat "Internal server error".
-    const message = err instanceof Error ? err.message : String(err);
-    const stack = err instanceof Error ? err.stack : undefined;
-    console.error("Video generation error:", message, stack);
+    // Dump everything we know about the error so we stop guessing what's
+    // throwing. Vercel's log preview truncates messages, so JSON-stringify
+    // the error with all own properties (Error's message/stack aren't
+    // enumerable by default).
+    const errAsAny = err as { name?: string; message?: string; stack?: string; status?: number; response?: unknown };
+    const debugObj = {
+      name: errAsAny?.name,
+      message: errAsAny?.message,
+      status: errAsAny?.status,
+      stack: errAsAny?.stack?.split("\n").slice(0, 8).join("\n"),
+      response: errAsAny?.response,
+      raw: typeof err === "object" ? JSON.stringify(err, Object.getOwnPropertyNames(err as object)) : String(err),
+    };
+    console.error("Video generation error (full):", JSON.stringify(debugObj));
+    const surfaced = `${errAsAny?.name ?? "Error"}: ${errAsAny?.message ?? String(err)}`;
     return NextResponse.json(
-      { error: `Video generation failed: ${message}` },
+      { error: `Video generation failed: ${surfaced}` },
       { status: 500 }
     );
   }
