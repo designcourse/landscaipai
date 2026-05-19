@@ -434,8 +434,32 @@ export function InpaintCanvas({
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col">
-      {/* Toolbar — bottom on mobile, top on desktop */}
-      <div className="order-2 flex items-center justify-between gap-2 border-t border-border bg-background px-3 py-2 lg:order-1 lg:border-b lg:border-t-0">
+      {/* Mobile-only header — keeps Cancel/Done always reachable. The bottom
+          toolbar gets crowded with tools and the Done button can slide off
+          the screen, leaving Cancel as the only visible exit. */}
+      <div className="order-1 flex items-center justify-between gap-2 border-b border-border bg-background px-3 py-2 lg:hidden">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="min-h-[44px] rounded-md px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+        >
+          Cancel
+        </button>
+        <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          Paint area to edit
+        </span>
+        <button
+          type="button"
+          onClick={handleConfirm}
+          disabled={!hasStrokes}
+          className="min-h-[44px] rounded-md bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-light disabled:opacity-50"
+        >
+          Done
+        </button>
+      </div>
+
+      {/* Toolbar — bottom on mobile (tools only), top on desktop (full) */}
+      <div className="order-3 flex items-center justify-between gap-2 border-t border-border bg-background px-3 py-2 lg:order-1 lg:border-b lg:border-t-0">
         <div className="flex items-center gap-1">
           {/* Brush */}
           <button
@@ -560,8 +584,8 @@ export function InpaintCanvas({
           </button>
         </div>
 
-        {/* Cancel / Done */}
-        <div className="flex items-center gap-2">
+        {/* Cancel / Done — desktop only (mobile has them in the top header) */}
+        <div className="hidden items-center gap-2 lg:flex">
           <button
             type="button"
             onClick={onCancel}
@@ -583,7 +607,7 @@ export function InpaintCanvas({
       {/* Canvas area */}
       <div
         ref={containerRef}
-        className="relative order-1 flex-1 overflow-hidden bg-foreground/95 lg:order-2"
+        className="relative order-2 flex-1 overflow-hidden bg-foreground/95 lg:order-2"
         style={{ touchAction: "none" }}
       >
         {!loaded ? (

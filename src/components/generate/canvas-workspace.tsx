@@ -1516,7 +1516,6 @@ export function CanvasWorkspace({
           projectId={project.id}
           projectName={project.name}
           credits={credits}
-          userProfile={userProfile}
           onUpload={handleUploadClick}
         />
       ) : (
