@@ -70,7 +70,7 @@ export function LandingPricing() {
       <div className="reveal mx-auto mt-12 grid max-w-5xl gap-element px-element lg:grid-cols-2 lg:px-0">
         {/* Starter card */}
         <div className="flex flex-col rounded-lg border border-border bg-white p-section">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+          <p className="text-sm font-semibold uppercase tracking-[0.12em] text-muted-foreground">
             Starter
           </p>
           <div className="mt-element flex items-baseline">
@@ -78,9 +78,9 @@ export function LandingPricing() {
             <span className="text-5xl font-bold leading-none tracking-tight text-foreground">
               0
             </span>
-            <span className="ml-2 text-sm text-muted-foreground">/ forever</span>
+            <span className="ml-2 text-base text-muted-foreground">/ forever</span>
           </div>
-          <p className="mt-element text-sm text-muted-foreground">
+          <p className="mt-element text-base text-muted-foreground">
             For one-yard redesigns and trying the tool.
           </p>
           <div className="my-group h-px bg-border" />
@@ -102,10 +102,10 @@ export function LandingPricing() {
         {/* Credit Packs card */}
         <div className="flex flex-col rounded-lg border border-border bg-white p-section">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            <p className="text-sm font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               Credit packs
             </p>
-            <p className="text-xs font-bold uppercase tracking-[0.12em] text-foreground">
+            <p className="text-sm font-bold uppercase tracking-[0.12em] text-foreground">
               Most popular
             </p>
           </div>
@@ -114,13 +114,13 @@ export function LandingPricing() {
             <span className="text-5xl font-bold leading-none tracking-tight text-foreground">
               15+
             </span>
-            <span className="ml-2 text-sm text-muted-foreground">/ one-time</span>
+            <span className="ml-2 text-base text-muted-foreground">/ one-time</span>
           </div>
-          <p className="mt-element text-sm text-muted-foreground">
+          <p className="mt-element text-base text-muted-foreground">
             Pay only for what you use. Credits never expire.
           </p>
 
-          <div className="mt-group px-3">
+          <div className="mt-group">
             <CreditPackSlider
               selectedIndex={packIndex}
               onChange={setPackIndex}
@@ -149,7 +149,7 @@ export function LandingPricing() {
 
 function FeatureLine({ children }: { children: React.ReactNode }) {
   return (
-    <li className="flex items-start gap-2 text-sm text-foreground">
+    <li className="flex items-start gap-2 text-base text-foreground">
       <svg
         className="mt-0.5 h-4 w-4 shrink-0 text-primary"
         fill="none"

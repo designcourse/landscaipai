@@ -33,7 +33,7 @@ export default function PricingPage() {
         <section className="grid gap-element lg:grid-cols-2">
           {/* Starter card */}
           <div className="flex flex-col rounded-lg border border-border bg-white p-section">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            <p className="text-sm font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               Starter
             </p>
             <div className="mt-element flex items-baseline">
@@ -41,9 +41,9 @@ export default function PricingPage() {
               <span className="text-5xl font-bold leading-none tracking-tight text-foreground">
                 0
               </span>
-              <span className="ml-2 text-sm text-muted-foreground">/ forever</span>
+              <span className="ml-2 text-base text-muted-foreground">/ forever</span>
             </div>
-            <p className="mt-element text-sm text-muted-foreground">
+            <p className="mt-element text-base text-muted-foreground">
               For one-yard redesigns and trying the tool.
             </p>
             <div className="my-group h-px bg-border" />
@@ -64,10 +64,10 @@ export default function PricingPage() {
           {/* Credit Packs card */}
           <div className="flex flex-col rounded-lg border border-border bg-white p-section">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              <p className="text-sm font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                 Credit packs
               </p>
-              <p className="text-xs font-bold uppercase tracking-[0.12em] text-foreground">
+              <p className="text-sm font-bold uppercase tracking-[0.12em] text-foreground">
                 Most popular
               </p>
             </div>
@@ -76,17 +76,18 @@ export default function PricingPage() {
               <span className="text-5xl font-bold leading-none tracking-tight text-foreground">
                 15+
               </span>
-              <span className="ml-2 text-sm text-muted-foreground">
+              <span className="ml-2 text-base text-muted-foreground">
                 / one-time
               </span>
             </div>
-            <p className="mt-element text-sm text-muted-foreground">
+            <p className="mt-element text-base text-muted-foreground">
               Pay only for what you use. Credits never expire.
             </p>
 
-            {/* Slider replaces the 4-pack tiles. Inset so edge labels stay
-                inside the card. */}
-            <div className="mt-group px-3">
+            {/* Slider replaces the 4-pack tiles. The slider component itself
+                insets the track to its column centers (12.5%/87.5%), so it
+                can run full-bleed within the card content area. */}
+            <div className="mt-group">
               <CreditPackSlider
                 selectedIndex={packIndex}
                 onChange={setPackIndex}
@@ -140,7 +141,7 @@ export default function PricingPage() {
 
 function FeatureLine({ children }: { children: React.ReactNode }) {
   return (
-    <li className="flex items-start gap-2 text-sm text-foreground">
+    <li className="flex items-start gap-2 text-base text-foreground">
       <svg
         className="mt-0.5 h-4 w-4 shrink-0 text-primary"
         fill="none"
