@@ -342,7 +342,7 @@
   max-width: 1240px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 1.4fr 1fr 1fr 1fr;
+  grid-template-columns: 1fr auto auto;
   gap: 48px;
   padding-bottom: 48px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
@@ -381,6 +381,10 @@
 .site-footer-social a:hover {
   background: var(--ls-primary);
   color: #fff;
+}
+.site-footer-col {
+  text-align: right;
+  min-width: 120px;
 }
 .site-footer-col h5 {
   font-family: var(--font-sans, system-ui, sans-serif);
