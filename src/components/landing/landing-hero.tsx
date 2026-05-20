@@ -212,7 +212,7 @@ export function LandingHero() {
         <div className="vA-copy">
           <span className="eyebrow">
             <span className="dot" />
-            <strong>New</strong>&nbsp;Generate in under 8 seconds
+            <strong>New</strong>&nbsp;AI landscape designs in seconds
           </span>
           <h1>
             Redesign your yard before you <em>plant a thing</em>.

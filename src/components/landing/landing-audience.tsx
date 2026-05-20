@@ -77,7 +77,7 @@ export function LandingAudience() {
             </p>
             <ul>
               <li>
-                Before/after generation in under 10 seconds per render
+                Generate before/after renders from a phone photo in seconds
               </li>
               <li>
                 Multiple styles in parallel — present options side by side
