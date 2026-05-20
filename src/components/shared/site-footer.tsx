@@ -3,21 +3,11 @@ import Image from "next/image";
 
 const FOOTER_LINKS = [
   {
-    heading: "Product",
-    links: [
-      { label: "Generator", href: "/generate" },
-      { label: "Plant library", href: "/#library" },
-      { label: "Gallery", href: "/gallery" },
-      { label: "Pro dashboard", href: "/dashboard" },
-    ],
-  },
-  {
     heading: "Resources",
     links: [
       { label: "Pricing", href: "/pricing" },
       { label: "FAQ", href: "/faq" },
       { label: "Contact", href: "/contact" },
-      { label: "For pros", href: "/#audience" },
     ],
   },
   {
@@ -45,20 +35,6 @@ export function SiteFooter() {
             AI landscape design for the front porch, the back fence, and every
             square foot of green in between.
           </p>
-          <div className="site-footer-social">
-            <a href="https://instagram.com" aria-label="Instagram">
-              IG
-            </a>
-            <a href="https://youtube.com" aria-label="YouTube">
-              YT
-            </a>
-            <a href="https://pinterest.com" aria-label="Pinterest">
-              Pi
-            </a>
-            <a href="https://tiktok.com" aria-label="TikTok">
-              TT
-            </a>
-          </div>
         </div>
         {FOOTER_LINKS.map((col) => (
           <div className="site-footer-col" key={col.heading}>
