@@ -383,13 +383,13 @@
   color: #fff;
 }
 .site-footer-col h5 {
-  font-family: var(--font-mono, ui-monospace);
-  font-size: 11px;
-  letter-spacing: 0.1em;
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 12px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #fff;
   margin: 0 0 16px;
-  font-weight: 600;
+  font-weight: 700;
 }
 .site-footer-col ul {
   list-style: none;
