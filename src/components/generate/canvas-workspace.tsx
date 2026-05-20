@@ -24,6 +24,7 @@ import { InpaintCanvas } from "./inpaint-canvas";
 import { PlantBrowser } from "./plant-browser";
 import { VideoGenerationModal, type VideoGenerationSubmit } from "./video-generation-modal";
 import { FinalizeVideoModal } from "./finalize-video-modal";
+import { EditorOnboarding } from "./editor-onboarding";
 import { useIsMobile } from "@/hooks/use-is-mobile";
 import {
   VIDEO_MODELS,
@@ -258,6 +259,21 @@ export function CanvasWorkspace({
       window.localStorage.setItem("landscaip-image-model", next);
     }
   }, []);
+
+  // First-run editor tour. Shown once per user (localStorage keyed by userId).
+  const onboardingStorageKey = `landscaip-editor-onboarding-seen-${userId}`;
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const seen = window.localStorage.getItem(onboardingStorageKey);
+    if (!seen) setShowOnboarding(true);
+  }, [onboardingStorageKey]);
+  const handleCloseOnboarding = useCallback(() => {
+    setShowOnboarding(false);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(onboardingStorageKey, "1");
+    }
+  }, [onboardingStorageKey]);
 
   // In-painting state
   const [inpaintMode, setInpaintMode] = useState(false);
@@ -1896,6 +1912,9 @@ export function CanvasWorkspace({
           </div>
         );
       })()}
+
+      {/* First-run editor tour */}
+      {showOnboarding && <EditorOnboarding onClose={handleCloseOnboarding} />}
 
       {/* Shimmer animation keyframes */}
       <style jsx global>{`
