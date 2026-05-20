@@ -1,22 +1,25 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { CREDIT_PACKS } from "@/lib/stripe/config";
 import { createClient } from "@/lib/supabase/client";
 import { usePurchaseCredits } from "@/components/billing/purchase-credits-modal-context";
 import { useAuthModal } from "@/components/shared/auth-modal-context";
+import { CreditPackSlider } from "@/components/billing/credit-pack-slider";
+
+const POPULAR_INDEX = Math.max(
+  0,
+  CREDIT_PACKS.findIndex((p) => p.badge === "Most popular")
+);
 
 export function LandingPricing() {
-  const router = useRouter();
   const { open: openCredits } = usePurchaseCredits();
   const { openModal } = useAuthModal();
   const [authed, setAuthed] = useState<boolean | null>(null);
+  const [packIndex, setPackIndex] = useState(
+    POPULAR_INDEX >= 0 ? POPULAR_INDEX : 1
+  );
 
-  // Detect signed-in state so we can route the CTA to either checkout (modal)
-  // or signup (auth modal). We don't await this on first paint — anonymous
-  // visitors hit the auth flow either way.
   useEffect(() => {
     const supabase = createClient();
     let active = true;
@@ -32,11 +35,16 @@ export function LandingPricing() {
     };
   }, []);
 
-  function handleBuyCredits() {
+  function handleBuy() {
+    if (authed) openCredits();
+    else openModal("signup");
+  }
+
+  function handleStartFree() {
     if (authed) {
-      openCredits();
+      // Already signed in — go straight to the dashboard.
+      window.location.href = "/dashboard";
     } else {
-      // Not signed in — kick off signup; user can return to the modal after.
       openModal("signup");
     }
   }
@@ -57,127 +65,89 @@ export function LandingPricing() {
         </p>
       </div>
 
-      <div className="pricing-grid pricing-grid-2col">
-        {/* Free tier */}
-        <div className="price-card reveal">
-          <div className="tier">Starter</div>
-          <div className="price">
-            <span className="num">$0</span>
-            <span className="per">/forever</span>
+      {/* Unified pricing card — Figma Variant E. Styled with plain Tailwind
+          (not the .pricing-grid CSS in landing.css) to match /pricing exactly. */}
+      <div
+        className="reveal mx-auto mt-12 max-w-5xl overflow-hidden rounded-lg border border-border bg-white"
+        style={{ boxShadow: "var(--shadow-sm)" }}
+      >
+        <div className="flex flex-col lg:flex-row">
+          {/* Starter section */}
+          <div className="border-b border-border p-section lg:w-[340px] lg:shrink-0 lg:border-b-0 lg:border-r">
+            <p className="text-xs font-semibold uppercase tracking-wider text-primary">
+              Starter · $0/forever
+            </p>
+            <p className="mt-element text-base font-semibold text-foreground">
+              For one-yard redesigns and trying the tool.
+            </p>
+            <ul className="mt-element space-y-2.5">
+              <FeatureLine>3 design generations on signup</FeatureLine>
+              <FeatureLine>Full plant &amp; hardscape library (550+ items)</FeatureLine>
+              <FeatureLine>In-painting + 16 style presets</FeatureLine>
+              <FeatureLine>Shareable project links</FeatureLine>
+            </ul>
           </div>
-          <p className="blurb">
-            For one-yard redesigns and trying the tool.
-          </p>
-          <ul>
-            <li>3 design generations on signup</li>
-            <li>Full 400+ species library</li>
-            <li>In-painting + style presets</li>
-            <li>Shareable project links</li>
-          </ul>
-          <Link href="/signup" className="btn btn-outline btn-lg">
-            Start free
-          </Link>
+
+          {/* Credit packs section */}
+          <div className="flex-1 p-section">
+            <p className="text-xs font-semibold uppercase tracking-wider text-primary">
+              Credit packs · $15+ one-time
+            </p>
+            <p className="mt-element text-base font-semibold text-foreground">
+              Pay only for what you use. Credits never expire.
+            </p>
+
+            <div className="mt-group px-3">
+              <CreditPackSlider
+                selectedIndex={packIndex}
+                onChange={setPackIndex}
+              />
+            </div>
+
+            <ul className="mt-group space-y-2.5">
+              <FeatureLine>~1 credit per design generation</FeatureLine>
+              <FeatureLine>8–32 credits per cinematic Veo video</FeatureLine>
+              <FeatureLine>Volume discount up to 17% off</FeatureLine>
+              <FeatureLine>Credits never expire</FeatureLine>
+            </ul>
+          </div>
         </div>
 
-        {/* Credit packs */}
-        <div className="price-card feat reveal" data-delay="1">
-          <span className="price-tag">Most popular</span>
-          <div className="tier">Credit packs</div>
-          <div className="price">
-            <span className="num">$15+</span>
-            <span className="per">one-time</span>
-          </div>
-          <p className="blurb">
-            Pay only for what you use. Credits never expire.
-          </p>
-
-          <div className="pack-pills">
-            {CREDIT_PACKS.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={handleBuyCredits}
-                className="pack-pill"
-              >
-                <span className="pack-pill-price">
-                  ${p.priceCents / 100}
-                </span>
-                <span className="pack-pill-credits">
-                  {p.credits} credits
-                </span>
-              </button>
-            ))}
-          </div>
-
-          <ul>
-            <li>~1 credit per design generation</li>
-            <li>8&ndash;32 credits per cinematic Veo video</li>
-            <li>Volume discount up to 17% off</li>
-            <li>Credits never expire</li>
-          </ul>
-
+        {/* CTAs */}
+        <div className="flex flex-wrap items-center gap-tight border-t border-border px-section py-element">
           <button
             type="button"
-            onClick={handleBuyCredits}
-            className="btn btn-primary btn-lg"
+            onClick={handleStartFree}
+            className="inline-flex h-11 items-center justify-center rounded-md border border-primary bg-white px-5 text-sm font-semibold text-primary transition-colors hover:bg-primary/5"
           >
-            {authed ? "Buy credits" : "Sign up to buy"}
+            Start free
+          </button>
+          <button
+            type="button"
+            onClick={handleBuy}
+            className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-5 text-sm font-semibold text-white transition-colors hover:bg-primary-light"
+          >
+            Sign up to buy
           </button>
         </div>
       </div>
-
-      {/* Custom styling for the 2-column variant + pack pills.
-          Scoped via .pricing-grid-2col so the existing 3-col rules elsewhere
-          aren't disturbed. */}
-      <style jsx>{`
-        :global(.landing-root .pricing-grid-2col) {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          max-width: 880px;
-        }
-        :global(.landing-root .pricing-grid-2col .pack-pills) {
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 10px;
-          margin: 0 0 22px;
-        }
-        :global(.landing-root .pricing-grid-2col .pack-pill) {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 2px;
-          padding: 12px 10px;
-          border-radius: 12px;
-          border: 1px solid #e5dfd0;
-          background: #fbf7ef;
-          color: var(--ls-fg, #171717);
-          cursor: pointer;
-          transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
-          font: inherit;
-        }
-        :global(.landing-root .pricing-grid-2col .pack-pill:hover) {
-          border-color: var(--ls-primary, #0f8000);
-          background: #f3efe1;
-          transform: translateY(-1px);
-        }
-        :global(.landing-root .pricing-grid-2col .pack-pill-price) {
-          font-size: 18px;
-          font-weight: 600;
-          letter-spacing: -0.01em;
-          color: var(--ls-primary, #0f8000);
-          line-height: 1;
-        }
-        :global(.landing-root .pricing-grid-2col .pack-pill-credits) {
-          font-size: 11px;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-          color: var(--ls-muted-fg, #737373);
-        }
-        @media (max-width: 720px) {
-          :global(.landing-root .pricing-grid-2col) {
-            grid-template-columns: 1fr;
-          }
-        }
-      `}</style>
     </section>
+  );
+}
+
+function FeatureLine({ children }: { children: React.ReactNode }) {
+  return (
+    <li className="flex items-start gap-2 text-sm text-foreground">
+      <svg
+        className="mt-0.5 h-4 w-4 shrink-0 text-primary"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={2.5}
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+      </svg>
+      <span>{children}</span>
+    </li>
   );
 }

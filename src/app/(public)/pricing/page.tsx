@@ -1,12 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import {
-  CREDIT_PACKS,
-  discountPercent,
-  pricePerCredit,
-} from "@/lib/stripe/config";
+import { useState } from "react";
+import { CREDIT_PACKS } from "@/lib/stripe/config";
 import { CreditPackSlider } from "@/components/billing/credit-pack-slider";
 
 const POPULAR_INDEX = Math.max(
@@ -19,8 +15,6 @@ export default function PricingPage() {
     POPULAR_INDEX >= 0 ? POPULAR_INDEX : 1
   );
   const selected = CREDIT_PACKS[packIndex];
-  const perCredit = useMemo(() => pricePerCredit(selected), [selected]);
-  const discount = useMemo(() => discountPercent(selected), [selected]);
 
   return (
     <main className="bg-background">
@@ -31,11 +25,11 @@ export default function PricingPage() {
           </h1>
           <p className="mx-auto mt-tight max-w-2xl text-base text-muted-foreground">
             3 free designs on signup. After that, buy credits in any size —
-            credits never expire.
+            they never expire.
           </p>
         </header>
 
-        {/* Unified pricing card */}
+        {/* Unified pricing card — Figma Variant E */}
         <section
           className="overflow-hidden rounded-lg border border-border bg-white"
           style={{ boxShadow: "var(--shadow-sm)" }}
@@ -44,10 +38,10 @@ export default function PricingPage() {
           <div className="flex flex-col lg:flex-row">
             {/* Starter section */}
             <div className="border-b border-border p-section lg:w-[340px] lg:shrink-0 lg:border-b-0 lg:border-r">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <p className="text-xs font-semibold uppercase tracking-wider text-primary">
                 Starter · $0/forever
               </p>
-              <p className="mt-element text-sm text-muted-foreground">
+              <p className="mt-element text-base font-semibold text-foreground">
                 For one-yard redesigns and trying the tool.
               </p>
               <ul className="mt-element space-y-2.5">
@@ -60,42 +54,19 @@ export default function PricingPage() {
 
             {/* Credit packs section */}
             <div className="flex-1 p-section">
-              <div className="flex items-baseline justify-between gap-element">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Credit packs · $15+ one-time
-                </p>
-                {discount > 0 && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
-                    Save {discount}%
-                  </span>
-                )}
-              </div>
-              <p className="mt-element text-sm text-muted-foreground">
+              <p className="text-xs font-semibold uppercase tracking-wider text-primary">
+                Credit packs · $15+ one-time
+              </p>
+              <p className="mt-element text-base font-semibold text-foreground">
                 Pay only for what you use. Credits never expire.
               </p>
 
-              {/* Slider — inset on both sides so the edge labels (e.g. $100)
-                  have breathing room and never overflow the card. */}
+              {/* Slider — inset so edge labels stay inside the card */}
               <div className="mt-group px-3">
                 <CreditPackSlider
                   selectedIndex={packIndex}
                   onChange={setPackIndex}
                 />
-              </div>
-
-              {/* Live readout */}
-              <div className="mt-group flex items-baseline justify-between gap-element rounded-md bg-panel px-element py-3">
-                <div className="flex items-baseline gap-1.5">
-                  <span className="text-2xl font-bold leading-none text-foreground">
-                    ${selected.priceCents / 100}
-                  </span>
-                  <span className="text-sm text-muted-foreground">
-                    for {selected.credits} credits
-                  </span>
-                </div>
-                <span className="text-xs text-muted-foreground">
-                  ${perCredit.toFixed(3)} / credit
-                </span>
               </div>
 
               <ul className="mt-group space-y-2.5">
@@ -111,7 +82,7 @@ export default function PricingPage() {
           <div className="flex flex-wrap items-center gap-tight border-t border-border px-section py-element">
             <Link
               href="/signup"
-              className="inline-flex h-11 items-center justify-center rounded-md border border-border bg-white px-5 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
+              className="inline-flex h-11 items-center justify-center rounded-md border border-primary bg-white px-5 text-sm font-semibold text-primary transition-colors hover:bg-primary/5"
             >
               Start free
             </Link>
@@ -119,7 +90,7 @@ export default function PricingPage() {
               href={`/signup?pack=${selected.id}`}
               className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-5 text-sm font-semibold text-white transition-colors hover:bg-primary-light"
             >
-              Sign up to buy {selected.credits} credits
+              Sign up to buy
             </Link>
           </div>
         </section>
