@@ -1,0 +1,85 @@
+.pwa-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: #0F8000;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  opacity: 1;
+  transition: opacity 500ms ease-out;
+  pointer-events: none;
+  display: none;
+}
+@media (display-mode: standalone) {
+  .pwa-splash {
+    display: flex;
+  }
+}
+/* iOS legacy standalone — JS sets this class on the component when navigator.standalone is true. */
+.pwa-splash.is-ios-standalone {
+  display: flex;
+}
+.pwa-splash.is-fading {
+  opacity: 0;
+}
+
+.pwa-splash-leaves {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+.pwa-splash-leaves .lf {
+  position: absolute;
+  width: 50px;
+  height: 50px;
+  will-change: transform;
+  filter: drop-shadow(0 4px 6px rgba(0, 30, 0, 0.18));
+}
+.pwa-splash-leaves .lf svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.pwa-splash-leaves .lf.cream svg  { fill: #f4ead2; }
+.pwa-splash-leaves .lf.sand svg   { fill: #d9c79a; }
+.pwa-splash-leaves .lf.lime svg   { fill: #b9d488; }
+.pwa-splash-leaves .lf.moss svg   { fill: #9bbf6b; }
+.pwa-splash-leaves .lf.olive svg  { fill: #d8e6b2; }
+.pwa-splash-leaves .lf.leaf svg   { fill: #2da31e; }
+.pwa-splash-leaves .lf.cream,
+.pwa-splash-leaves .lf.sand   { opacity: 0.55; }
+.pwa-splash-leaves .lf.lime,
+.pwa-splash-leaves .lf.moss,
+.pwa-splash-leaves .lf.olive  { opacity: 0.42; }
+.pwa-splash-leaves .lf.leaf   { opacity: 0.30; }
+
+.pwa-splash-logo {
+  position: relative;
+  z-index: 1;
+  width: 38vmin;
+  max-width: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: pwa-splash-logo-in 600ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+.pwa-splash-logo img {
+  width: 100%;
+  height: auto;
+  display: block;
+  filter: drop-shadow(0 6px 18px rgba(0, 30, 0, 0.25));
+}
+
+@keyframes pwa-splash-logo-in {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pwa-splash-logo {
+    animation: none;
+  }
+}

@@ -6,6 +6,7 @@ import { AuthModalProvider } from "@/components/shared/auth-modal-context";
 import { AuthModal } from "@/components/shared/auth-modal";
 import { PurchaseCreditsProvider } from "@/components/billing/purchase-credits-modal-context";
 import { ServiceWorkerRegister } from "@/components/shared/service-worker-register";
+import { PwaSplash } from "@/components/shared/pwa-splash";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -70,6 +71,7 @@ export default function RootLayout({
           </PurchaseCreditsProvider>
         </AuthModalProvider>
         <ServiceWorkerRegister />
+        <PwaSplash />
       </body>
     </html>
   );
