@@ -121,22 +121,23 @@ export function LandingPlantDetail() {
             Know what you&apos;re planting <em>before</em> you buy it.
           </h2>
           <p className="plant-lede">
-            Every specimen in the library comes with hardiness zones, mature
-            size, sun &amp; water needs, toxicity flags, and the style palettes
-            it complements — so your yard still works two seasons from now.
+            Every specimen in the library is tagged with its USDA hardiness
+            zone range — so when you set your zone, you only see plants that
+            will actually live where you live.
           </p>
           <ul className="plant-bullets">
             <li>
-              <strong>Regional filters.</strong> Only see plants that thrive in
-              your USDA zone.
+              <strong>Zone-filtered.</strong> Set your ZIP or zone once; the
+              library hides anything that won&apos;t survive a winter there.
             </li>
             <li>
-              <strong>Companion-aware.</strong> Spot juglone, allelopathy and
-              root conflicts before they cost you a tree.
+              <strong>Categorized.</strong> Trees, shrubs, perennials,
+              groundcover, ornamental grasses, succulents, edibles, and
+              hardscape — eight tabs to narrow what you&apos;re looking at.
             </li>
             <li>
-              <strong>Style-tagged.</strong> Every card tells you which design
-              palettes it fits — Modern, Cottage, Japanese Zen.
+              <strong>Reference, not decoration.</strong> The plants you select
+              become part of the prompt the AI uses to render your design.
             </li>
           </ul>
         </div>

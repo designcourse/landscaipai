@@ -1,40 +1,40 @@
 const FAQS = [
   {
     q: "Is it really free to try?",
-    a: "Yes. Three full designs, no credit card. You keep the designs and the plant list forever — exports carry a small watermark until you upgrade.",
+    a: "Yes. Three full design generations on signup, no credit card required. After that, buy credit packs in any size — credits never expire.",
     open: true,
   },
   {
     q: "Does my house get distorted in the render?",
-    a: "No. The model is trained to freeze every structural element — siding, windows, driveway, fence line — and only alter vegetation, hardscape, and ground cover.",
+    a: "The model is prompted to preserve structural elements — siding, windows, doors, driveway, fence line — and only modify vegetation, hardscape, and ground cover. Results may vary; always sanity-check before acting on a design.",
     delay: 1,
   },
   {
     q: "Will the plants actually grow where I live?",
-    a: "We use your address to pull USDA hardiness zone, first/last frost dates, and regional soil type. Every recommended species is filtered against those three constraints before it ever shows up in your design.",
+    a: "We filter the plant library by USDA hardiness zone. Set your ZIP code or zone once in the project menu and the library only shows plants suited to your zone.",
     delay: 2,
   },
   {
     q: "Can I use this for a condo, townhouse, or rental?",
-    a: "Absolutely. Any photo of outdoor space works — balcony, courtyard, patio, or a single raised bed.",
+    a: "Yes. Any photo of an outdoor space works — balcony, courtyard, patio, or a single raised bed.",
   },
   {
     q: "Do you store my photos?",
-    a: "Only on your account and only so you can return to your designs later. You can delete any photo from Settings → Data; it's permanently removed within 24 hours.",
+    a: "Your uploads and renderings are stored privately in your account so you can return to them later. Delete any photo or generation from its hover menu in the editor, or delete your account entirely from Account settings.",
     delay: 1,
   },
   {
     q: "Do I need to know plant names?",
-    a: "No. Browse by style, color, season, or vibe. We'll surface the Latin names if you want them — and hide them if you don't.",
+    a: "No. Browse the library by category (trees, shrubs, perennials, groundcover, succulents, edibles, ornamental grasses, hardscape) and select what you like. Common and Latin names are shown when available.",
     delay: 2,
   },
   {
     q: "Can I use renders in a commercial client proposal?",
-    a: "On Agency plans, yes — renders, PDFs, and CAD exports ship white-labeled with your branding and are licensed for commercial use.",
+    a: "Yes. You own the renderings the Service produces from your photos and can use them for personal or commercial purposes — see the Terms of Service for full details.",
   },
   {
     q: "How do I cancel?",
-    a: "One click in Settings → Billing. No email, no retention call.",
+    a: "Credit packs are one-time purchases — there's nothing to cancel. To delete your account, email support@landscaip.co from the address on file.",
     delay: 1,
   },
 ];

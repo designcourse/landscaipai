@@ -26,7 +26,7 @@ export function LandingVideoTransform() {
         </video>
         <div className="vt-chip">
           <span className="vt-dot" />
-          Auto-generating · 8s
+          Auto-generating
         </div>
       </div>
       <div className="vt-foot reveal">

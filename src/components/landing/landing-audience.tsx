@@ -37,33 +37,31 @@ export function LandingAudience() {
         <div className={`aud-panel${pick === "diy" ? " is-active" : ""}`}>
           <div className="ap-copy">
             <div className="ap-eyebrow">For homeowners</div>
-            <h3>Design your yard on the couch. Plant it this weekend.</h3>
+            <h3>Design your yard on the couch.</h3>
             <p className="lede">
-              Skip the $4,000 landscape architect. Get a real planting plan
-              from a photo, shop it at the nursery down the street.
+              See what your yard could look like before you spend a dollar at
+              the nursery — or hire anyone.
             </p>
             <ul>
               <li>
-                Zone-matched species — your hardiness zone, sun, and soil,
-                handled automatically
+                Zone-matched plant library — set your USDA hardiness zone once
               </li>
               <li>
-                Shoppable plant list with quantities and nearest-nursery price
-                check
+                16 style presets plus custom prompts for anything in between
               </li>
-              <li>Seasonal care calendar emailed to you each month</li>
               <li>
-                Swap any plant for a drought-tolerant, native, or pet-safe
-                alternative
+                In-paint specific areas — swap a single tree, change one bed
               </li>
-              <li>Budget slider — tune the design from $500 to $10,000</li>
+              <li>
+                Generate a transformation video to share before you commit
+              </li>
             </ul>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               <Link href="/signup" className="btn btn-primary btn-lg">
                 Try it free
               </Link>
-              <Link href="/gallery" className="btn btn-ghost btn-lg">
-                See sample plan &rarr;
+              <Link href="/pricing" className="btn btn-ghost btn-lg">
+                See pricing &rarr;
               </Link>
             </div>
           </div>
@@ -72,27 +70,35 @@ export function LandingAudience() {
         <div className={`aud-panel${pick === "pro" ? " is-active" : ""}`}>
           <div className="ap-copy">
             <div className="ap-eyebrow">For landscape professionals</div>
-            <h3>Close more clients. Spec jobs in minutes, not days.</h3>
+            <h3>Show clients a finished yard before you turn a shovel.</h3>
             <p className="lede">
-              Generate branded client presentations on-site. Export planting
-              schedules, takeoffs, and PDFs that look like you built them in
-              CAD.
+              Render multiple style options from a phone photo in seconds.
+              Iterate on-site, share read-only links, close warmer.
             </p>
             <ul>
               <li>
-                White-label client presentations with your logo and palette
+                Before/after generation in under 10 seconds per render
               </li>
-              <li>PDF + CAD export with plant legend, quantities, and zones</li>
-              <li>Multi-project dashboard for up to 200 active jobs</li>
-              <li>Commercial licensing and multi-seat agency plans</li>
-              <li>API + Zapier for integration with your CRM or estimator</li>
+              <li>
+                Multiple styles in parallel — present options side by side
+              </li>
+              <li>
+                Zone-aware plant library so every species is regionally
+                appropriate
+              </li>
+              <li>
+                Save projects per address; share with a read-only link
+              </li>
+              <li>
+                Credits-based pricing — no seat fees, no monthly minimum
+              </li>
             </ul>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <Link href="/contact" className="btn btn-primary btn-lg">
-                Book a demo
+              <Link href="/signup" className="btn btn-primary btn-lg">
+                Start free
               </Link>
               <Link href="/pricing" className="btn btn-ghost btn-lg">
-                Agency pricing &rarr;
+                See pricing &rarr;
               </Link>
             </div>
           </div>

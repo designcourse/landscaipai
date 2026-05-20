@@ -9,7 +9,6 @@ import { LandingGallery } from "@/components/landing/landing-gallery";
 import { LandingShaderReveal } from "@/components/landing/landing-shader-reveal";
 import { LandingAudience } from "@/components/landing/landing-audience";
 import { LandingPricing } from "@/components/landing/landing-pricing";
-import { LandingTestimonials } from "@/components/landing/landing-testimonials";
 import { LandingFAQ } from "@/components/landing/landing-faq";
 import { LandingCTA } from "@/components/landing/landing-cta";
 import { LandingRevealObserver } from "@/components/landing/landing-reveal-observer";
@@ -34,7 +33,6 @@ export default function LandingPage() {
       <LandingShaderReveal />
       <LandingAudience />
       <LandingPricing />
-      <LandingTestimonials />
       <LandingFAQ />
       <LandingCTA />
       <LandingRevealObserver />

@@ -14,14 +14,14 @@ const STEPS = [
     n: "02",
     title: "Pick a style, generate a design",
     body:
-      "Cottage, Modern, Zen, Xeriscape, plus 2 more. Your house stays pixel-identical — only the landscape changes.",
+      "16 style presets — Modern, Cottage, Japanese, Mediterranean, and more. The house and hardscape stay in place; only the landscape changes.",
     label: "Generator · placeholder",
   },
   {
     n: "03",
-    title: "Shop the plant list or hand off to a pro",
+    title: "Iterate, refine, share",
     body:
-      "Every plant in your design is tagged with species, quantity, hardiness zone, and nearest nursery price.",
+      "Tweak the prompt, in-paint a single bed, swap plants from the library, or generate a transformation video. Share any design with a read-only link.",
     label: "Shopping list · placeholder",
   },
 ];
@@ -67,7 +67,7 @@ export function LandingHowItWorks() {
             From phone photo to planted yard, in <em>three steps</em>.
           </h2>
           <p className="sec-sub">
-            No measuring, no plant-naming, no 3-D software. Snap, style, shop.
+            No measuring, no plant-naming, no 3-D software. Snap, style, refine.
           </p>
         </div>
         <ol className="how-steps" ref={listRef}>

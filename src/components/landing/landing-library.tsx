@@ -48,12 +48,12 @@ export function LandingLibrary() {
           Catalog
         </span>
         <h2 className="lib-title">
-          <em>500+</em> plants, materials &amp; fixtures — dragged straight onto
-          your yard.
+          <em>500+</em> plants, materials &amp; fixtures — referenced into
+          your design.
         </h2>
         <p className="lib-sub">
-          Regionalized for your zone. Filter by sun, water, wildlife,
-          maintenance.
+          Filtered to your USDA hardiness zone. Browse by category, select
+          specific species, and they become part of the prompt.
         </p>
       </div>
 

@@ -21,7 +21,7 @@ const CARDS: GalCard[] = [
     before: "/landing/gal-elevated-before.png",
     after: "/landing/gal-elevated-after.png",
     pill: "Elevated",
-    meta: "Portland, OR · $2.4k budget",
+    meta: "Modern",
   },
   {
     style: "major",
@@ -30,7 +30,7 @@ const CARDS: GalCard[] = [
     before: "/landing/gal-major-before.png",
     after: "/landing/gal-major-after.png",
     pill: "Major Enhancement",
-    meta: "Austin, TX",
+    meta: "Modern",
     delay: 1,
   },
   {
@@ -40,7 +40,7 @@ const CARDS: GalCard[] = [
     before: "/landing/gal-walkway-before.png",
     after: "/landing/gal-walkway-after.png",
     pill: "New Walkway",
-    meta: "Phoenix, AZ",
+    meta: "In-ground Pool",
     delay: 3,
   },
   {
@@ -50,7 +50,7 @@ const CARDS: GalCard[] = [
     before: "/landing/gal-sidewalk-before.png",
     after: "/landing/gal-sidewalk-after.png",
     pill: "New Walkway",
-    meta: "Scottsdale, AZ",
+    meta: "In-ground Pool",
     delay: 1,
   },
   {
@@ -60,7 +60,7 @@ const CARDS: GalCard[] = [
     before: "/landing/gal-wall-before.png",
     after: "/landing/gal-wall-after.png",
     pill: "Wall Enhancement",
-    meta: "Madison, WI",
+    meta: "Child Friendly",
     delay: 2,
   },
   {
@@ -69,7 +69,7 @@ const CARDS: GalCard[] = [
     before: "/landing/gal-entertain-before.png",
     after: "/landing/gal-entertain-after.png",
     pill: "Entertainment",
-    meta: "Asheville, NC",
+    meta: "Modern",
     delay: 2,
   },
   {
@@ -79,7 +79,7 @@ const CARDS: GalCard[] = [
     before: "/landing/gal-desert-before.png",
     after: "/landing/gal-desert-after.png",
     pill: "Desert Xeriscape",
-    meta: "Phoenix, AZ",
+    meta: "Xeriscape",
     delay: 3,
   },
 ];
@@ -253,8 +253,8 @@ export function LandingGallery() {
           Real yards, redesigned with <em>Landscaip</em>.
         </h2>
         <p className="sec-sub">
-          1,200+ designs generated this week. Hover any card to reveal the
-          before.
+          Sample before/after pairs across styles. Hover any card to reveal
+          the before.
         </p>
       </div>
       <div className="gallery-filters reveal">
