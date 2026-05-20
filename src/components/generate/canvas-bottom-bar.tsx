@@ -27,6 +27,7 @@ interface CanvasBottomBarProps {
   customPrompt: string;
   onCustomPromptChange: (v: string) => void;
   onGenerate: () => void;
+  onBuyMoreCredits: () => void;
   onOpenLibrary: () => void;
   // Video generation
   onOpenVideoModal: () => void;
@@ -107,6 +108,7 @@ export function CanvasBottomBar({
   customPrompt,
   onCustomPromptChange,
   onGenerate,
+  onBuyMoreCredits,
   onOpenLibrary,
   onOpenVideoModal,
   videoButtonState,
@@ -472,34 +474,48 @@ export function CanvasBottomBar({
           )}
         </div>
 
-        {/* Generate CTA — primary green container so it reads as THE primary action */}
+        {/* Generate CTA — primary green container so it reads as THE primary action.
+            When the user is out of credits, swap to a "Buy more credits" CTA that
+            opens the purchase modal directly instead of showing a dead Generate button. */}
         <div
           className="flex items-center justify-center overflow-hidden rounded-[20px] bg-primary px-[11px] py-3 transition-colors hover:bg-primary-light"
           style={{ boxShadow: "var(--shadow-toolbar)" }}
         >
-          <button
-            onClick={onGenerate}
-            disabled={generating || credits < 1 || !hasSelection}
-            className="flex h-10 items-center justify-center gap-1.5 whitespace-nowrap px-5 py-2.5 text-base font-semibold text-white disabled:opacity-50"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/icons/leaf-mark-white.png"
-              alt=""
-              aria-hidden
-              className="h-[22px] w-[22px]"
-            />
-            {generating ? (
-              "Generating..."
-            ) : (
-              <>
-                Generate
-                <span className="font-medium" style={{ color: "#95f788" }}>
-                  {" "}(1 credit)
-                </span>
-              </>
-            )}
-          </button>
+          {credits < 1 && !generating ? (
+            <button
+              onClick={onBuyMoreCredits}
+              className="flex h-10 items-center justify-center gap-1.5 whitespace-nowrap px-5 py-2.5 text-base font-semibold text-white"
+            >
+              <svg className="h-[22px] w-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v8m-4-4h8m5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Buy more credits
+            </button>
+          ) : (
+            <button
+              onClick={onGenerate}
+              disabled={generating || !hasSelection}
+              className="flex h-10 items-center justify-center gap-1.5 whitespace-nowrap px-5 py-2.5 text-base font-semibold text-white disabled:opacity-50"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/icons/leaf-mark-white.png"
+                alt=""
+                aria-hidden
+                className="h-[22px] w-[22px]"
+              />
+              {generating ? (
+                "Generating..."
+              ) : (
+                <>
+                  Generate
+                  <span className="font-medium" style={{ color: "#95f788" }}>
+                    {" "}(1 credit)
+                  </span>
+                </>
+              )}
+            </button>
+          )}
         </div>
       </div>
     </div>

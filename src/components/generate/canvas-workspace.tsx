@@ -1695,6 +1695,7 @@ export function CanvasWorkspace({
             customPrompt={customPrompt}
             onCustomPromptChange={setCustomPrompt}
             onGenerate={handleGenerate}
+            onBuyMoreCredits={openPurchaseCredits}
             onOpenLibrary={() => setBrowserOpen(true)}
             onOpenVideoModal={handleOpenVideoModal}
             videoButtonState={videoButtonState}
@@ -1747,6 +1748,7 @@ export function CanvasWorkspace({
             customPrompt={customPrompt}
             onCustomPromptChange={setCustomPrompt}
             onGenerate={handleGenerate}
+            onBuyMoreCredits={openPurchaseCredits}
             onOpenLibrary={() => setBrowserOpen(true)}
             onOpenVideoModal={handleOpenVideoModal}
             videoButtonState={videoButtonState}

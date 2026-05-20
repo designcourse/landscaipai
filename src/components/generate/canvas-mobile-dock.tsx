@@ -22,6 +22,7 @@ interface CanvasMobileDockProps {
   customPrompt: string;
   onCustomPromptChange: (v: string) => void;
   onGenerate: () => void;
+  onBuyMoreCredits: () => void;
   onOpenLibrary: () => void;
   onOpenVideoModal: () => void;
   videoButtonState:
@@ -310,8 +311,10 @@ export function CanvasMobileDock(props: CanvasMobileDockProps) {
             {activeTab === "generate" && (
               <GeneratePanel
                 onGenerate={props.onGenerate}
+                onBuyMoreCredits={props.onBuyMoreCredits}
                 generating={props.generating}
                 canGenerate={canGenerate}
+                outOfCredits={props.credits < 1}
                 blockedReason={generateBlockedReason}
                 style={props.style}
                 styleName={selectedPreset?.name ?? null}
@@ -762,8 +765,10 @@ function PromptPanel({
 // ----------------------------------------------------------------------------
 function GeneratePanel({
   onGenerate,
+  onBuyMoreCredits,
   generating,
   canGenerate,
+  outOfCredits,
   blockedReason,
   style,
   styleName,
@@ -775,8 +780,10 @@ function GeneratePanel({
   customPrompt,
 }: {
   onGenerate: () => void;
+  onBuyMoreCredits: () => void;
   generating: boolean;
   canGenerate: boolean;
+  outOfCredits: boolean;
   blockedReason: string | null;
   style: string | null;
   styleName: string | null;
@@ -802,23 +809,35 @@ function GeneratePanel({
         {blockedReason ?? "Ready \u00b7 1 credit will be used"}
       </p>
 
-      <button
-        onClick={onGenerate}
-        disabled={!canGenerate}
-        className="flex h-12 w-full items-center justify-center gap-2 rounded-md bg-primary text-base font-semibold text-white transition-colors hover:bg-primary-light disabled:opacity-50"
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/icons/leaf-mark-white.png"
-          alt=""
-          aria-hidden
-          className="h-6 w-6"
-        />
-        {generating ? "Generating..." : "Generate"}
-        <span className="font-medium" style={{ color: "#95f788" }}>
-          (1 credit)
-        </span>
-      </button>
+      {outOfCredits && !generating ? (
+        <button
+          onClick={onBuyMoreCredits}
+          className="flex h-12 w-full items-center justify-center gap-2 rounded-md bg-primary text-base font-semibold text-white transition-colors hover:bg-primary-light"
+        >
+          <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v8m-4-4h8m5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          Buy more credits
+        </button>
+      ) : (
+        <button
+          onClick={onGenerate}
+          disabled={!canGenerate}
+          className="flex h-12 w-full items-center justify-center gap-2 rounded-md bg-primary text-base font-semibold text-white transition-colors hover:bg-primary-light disabled:opacity-50"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/icons/leaf-mark-white.png"
+            alt=""
+            aria-hidden
+            className="h-6 w-6"
+          />
+          {generating ? "Generating..." : "Generate"}
+          <span className="font-medium" style={{ color: "#95f788" }}>
+            (1 credit)
+          </span>
+        </button>
+      )}
 
       {summaryChips.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
