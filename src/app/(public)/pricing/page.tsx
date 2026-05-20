@@ -1,13 +1,27 @@
-import Link from "next/link";
-import { CREDIT_PACKS, pricePerCredit, discountPercent } from "@/lib/stripe/config";
+"use client";
 
-export const metadata = {
-  title: "Pricing — Landscaip",
-  description:
-    "Start free, then pay only for what you use. Credits never expire.",
-};
+import Link from "next/link";
+import { useMemo, useState } from "react";
+import {
+  CREDIT_PACKS,
+  discountPercent,
+  pricePerCredit,
+} from "@/lib/stripe/config";
+import { CreditPackSlider } from "@/components/billing/credit-pack-slider";
+
+const POPULAR_INDEX = Math.max(
+  0,
+  CREDIT_PACKS.findIndex((p) => p.badge === "Most popular")
+);
 
 export default function PricingPage() {
+  const [packIndex, setPackIndex] = useState(
+    POPULAR_INDEX >= 0 ? POPULAR_INDEX : 1
+  );
+  const selected = CREDIT_PACKS[packIndex];
+  const perCredit = useMemo(() => pricePerCredit(selected), [selected]);
+  const discount = useMemo(() => discountPercent(selected), [selected]);
+
   return (
     <main className="bg-background">
       <div className="mx-auto max-w-5xl px-element py-section">
@@ -17,110 +31,102 @@ export default function PricingPage() {
           </h1>
           <p className="mx-auto mt-tight max-w-2xl text-base text-muted-foreground">
             3 free designs on signup. After that, buy credits in any size —
-            credits never expire and roughly cover one design generation each.
+            credits never expire.
           </p>
         </header>
 
-        <div className="grid gap-element md:grid-cols-2">
-          {/* Free tier */}
-          <div className="flex flex-col gap-element rounded-lg border border-border bg-white p-element">
-            <div>
+        {/* Unified pricing card */}
+        <section
+          className="overflow-hidden rounded-lg border border-border bg-white"
+          style={{ boxShadow: "var(--shadow-sm)" }}
+        >
+          {/* Body: Starter (left) + Credit packs with slider (right) */}
+          <div className="flex flex-col lg:flex-row">
+            {/* Starter section */}
+            <div className="border-b border-border p-section lg:w-[340px] lg:shrink-0 lg:border-b-0 lg:border-r">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Starter
+                Starter · $0/forever
               </p>
-              <div className="mt-tight flex items-baseline gap-1">
-                <span className="text-4xl font-bold text-foreground">$0</span>
-                <span className="text-sm text-muted-foreground">/forever</span>
-              </div>
-              <p className="mt-tight text-sm text-muted-foreground">
+              <p className="mt-element text-sm text-muted-foreground">
                 For one-yard redesigns and trying the tool.
               </p>
+              <ul className="mt-element space-y-2.5">
+                <FeatureLine>3 design generations on signup</FeatureLine>
+                <FeatureLine>Full plant &amp; hardscape library (550+ items)</FeatureLine>
+                <FeatureLine>In-painting + 16 style presets</FeatureLine>
+                <FeatureLine>Shareable project links</FeatureLine>
+              </ul>
             </div>
-            <ul className="space-y-1.5 text-sm text-foreground">
-              <FeatureLine>3 design generations on signup</FeatureLine>
-              <FeatureLine>Full plant &amp; hardscape library (550+ items)</FeatureLine>
-              <FeatureLine>In-painting + 16 style presets</FeatureLine>
-              <FeatureLine>Shareable project links</FeatureLine>
-            </ul>
+
+            {/* Credit packs section */}
+            <div className="flex-1 p-section">
+              <div className="flex items-baseline justify-between gap-element">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Credit packs · $15+ one-time
+                </p>
+                {discount > 0 && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
+                    Save {discount}%
+                  </span>
+                )}
+              </div>
+              <p className="mt-element text-sm text-muted-foreground">
+                Pay only for what you use. Credits never expire.
+              </p>
+
+              {/* Slider — inset on both sides so the edge labels (e.g. $100)
+                  have breathing room and never overflow the card. */}
+              <div className="mt-group px-3">
+                <CreditPackSlider
+                  selectedIndex={packIndex}
+                  onChange={setPackIndex}
+                />
+              </div>
+
+              {/* Live readout */}
+              <div className="mt-group flex items-baseline justify-between gap-element rounded-md bg-panel px-element py-3">
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-2xl font-bold leading-none text-foreground">
+                    ${selected.priceCents / 100}
+                  </span>
+                  <span className="text-sm text-muted-foreground">
+                    for {selected.credits} credits
+                  </span>
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  ${perCredit.toFixed(3)} / credit
+                </span>
+              </div>
+
+              <ul className="mt-group space-y-2.5">
+                <FeatureLine>~1 credit per design generation</FeatureLine>
+                <FeatureLine>8–32 credits per cinematic Veo video</FeatureLine>
+                <FeatureLine>Volume discount up to 17% off</FeatureLine>
+                <FeatureLine>Credits never expire</FeatureLine>
+              </ul>
+            </div>
+          </div>
+
+          {/* CTAs */}
+          <div className="flex flex-wrap items-center gap-tight border-t border-border px-section py-element">
             <Link
               href="/signup"
-              className="mt-auto inline-flex h-11 items-center justify-center rounded-md border border-border bg-white text-sm font-semibold text-foreground transition-colors hover:bg-muted"
+              className="inline-flex h-11 items-center justify-center rounded-md border border-border bg-white px-5 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
             >
               Start free
             </Link>
-          </div>
-
-          {/* Credit packs */}
-          <div
-            className="relative flex flex-col gap-element rounded-lg border-2 border-primary bg-white p-element"
-            style={{ boxShadow: "var(--shadow-md)" }}
-          >
-            <span className="absolute -top-3 right-element rounded-full bg-primary px-3 py-0.5 text-xs font-semibold text-white">
-              Most popular
-            </span>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Credit packs
-              </p>
-              <div className="mt-tight flex items-baseline gap-1">
-                <span className="text-4xl font-bold text-primary">$15+</span>
-                <span className="text-sm text-muted-foreground">one-time</span>
-              </div>
-              <p className="mt-tight text-sm text-muted-foreground">
-                Pay only for what you use. Credits never expire.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              {CREDIT_PACKS.map((pack) => {
-                const disc = discountPercent(pack);
-                return (
-                  <div
-                    key={pack.id}
-                    className="rounded-md border border-border bg-panel p-3 text-left"
-                  >
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-xl font-bold text-primary">
-                        ${pack.priceCents / 100}
-                      </span>
-                      {disc > 0 && (
-                        <span className="text-[10px] font-semibold uppercase tracking-wider text-primary-dark">
-                          −{disc}%
-                        </span>
-                      )}
-                    </div>
-                    <div className="mt-0.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                      {pack.credits} credits
-                    </div>
-                    <div className="mt-1 text-[11px] text-muted-foreground">
-                      ${pricePerCredit(pack).toFixed(2)} / credit
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <ul className="space-y-1.5 text-sm text-foreground">
-              <FeatureLine>~1 credit per design generation</FeatureLine>
-              <FeatureLine>8–32 credits per cinematic video</FeatureLine>
-              <FeatureLine>Volume discount up to 17% off</FeatureLine>
-              <FeatureLine>Credits never expire</FeatureLine>
-            </ul>
-
             <Link
-              href="/signup"
-              className="mt-auto inline-flex h-11 items-center justify-center rounded-md bg-primary text-sm font-semibold text-white transition-colors hover:bg-primary-light"
+              href={`/signup?pack=${selected.id}`}
+              className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-5 text-sm font-semibold text-white transition-colors hover:bg-primary-light"
             >
-              Sign up to buy
+              Sign up to buy {selected.credits} credits
             </Link>
           </div>
-        </div>
+        </section>
 
         {/* Refund policy summary */}
         <section className="mt-section rounded-lg border border-border bg-panel p-element">
-          <h2 className="text-lg font-semibold text-foreground">
-            Refund policy
-          </h2>
+          <h2 className="text-lg font-semibold text-foreground">Refund policy</h2>
           <p className="mt-tight text-sm text-muted-foreground">
             Because credits are digital goods that are usable immediately, we
             do not refund credits that have been used. For unused credit
@@ -149,7 +155,7 @@ export default function PricingPage() {
 
 function FeatureLine({ children }: { children: React.ReactNode }) {
   return (
-    <li className="flex items-start gap-2">
+    <li className="flex items-start gap-2 text-sm text-foreground">
       <svg
         className="mt-0.5 h-4 w-4 shrink-0 text-primary"
         fill="none"

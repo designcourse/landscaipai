@@ -6,6 +6,7 @@ import {
   discountPercent,
   pricePerCredit,
 } from "@/lib/stripe/config";
+import { CreditPackSlider } from "./credit-pack-slider";
 
 interface PurchaseCreditsModalProps {
   open: boolean;
@@ -20,7 +21,10 @@ interface PurchaseCreditsModalProps {
   subtitle?: string;
 }
 
-const DEFAULT_PACK_INDEX = 1; // start on the "Most popular" pack
+const DEFAULT_PACK_INDEX = Math.max(
+  0,
+  CREDIT_PACKS.findIndex((p) => p.badge === "Most popular")
+);
 
 export function PurchaseCreditsModal({
   open,
@@ -30,7 +34,9 @@ export function PurchaseCreditsModal({
   title,
   subtitle,
 }: PurchaseCreditsModalProps) {
-  const [packIndex, setPackIndex] = useState(DEFAULT_PACK_INDEX);
+  const [packIndex, setPackIndex] = useState(
+    DEFAULT_PACK_INDEX >= 0 ? DEFAULT_PACK_INDEX : 1
+  );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,7 +47,7 @@ export function PurchaseCreditsModal({
   // Reset selection + lock body scroll when opening
   useEffect(() => {
     if (!open) return;
-    setPackIndex(DEFAULT_PACK_INDEX);
+    setPackIndex(DEFAULT_PACK_INDEX >= 0 ? DEFAULT_PACK_INDEX : 1);
     setError(null);
     setSubmitting(false);
     const original = document.body.style.overflow;
@@ -69,7 +75,8 @@ export function PurchaseCreditsModal({
     setError(null);
 
     try {
-      const fallback = typeof window !== "undefined" ? window.location.href : "/dashboard";
+      const fallback =
+        typeof window !== "undefined" ? window.location.href : "/dashboard";
       const res = await fetch("/api/billing/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -87,7 +94,6 @@ export function PurchaseCreditsModal({
         return;
       }
 
-      // Redirect to Stripe Checkout
       window.location.href = data.url;
     } catch {
       setError("Network error. Please try again.");
@@ -142,18 +148,27 @@ export function PurchaseCreditsModal({
             </p>
           </div>
 
-          {/* Live price + credits readout */}
-          <div className="mb-group rounded-lg border border-border bg-white px-element py-element">
+          {/* Slider — insets keep edge labels off the modal sides */}
+          <div className="mb-group px-3">
+            <CreditPackSlider
+              selectedIndex={packIndex}
+              onChange={setPackIndex}
+              disabled={submitting}
+            />
+          </div>
+
+          {/* Live readout — price + per-credit + optional savings chip */}
+          <div className="mb-group rounded-md bg-white px-element py-element ring-1 ring-border">
             <div className="flex items-baseline justify-between gap-element">
-              <div className="flex items-baseline gap-1">
-                <span className="text-4xl font-semibold leading-none tracking-tight text-foreground">
-                  ${(pack.priceCents / 100).toFixed(0)}
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-3xl font-bold leading-none tracking-tight text-foreground">
+                  ${pack.priceCents / 100}
                 </span>
                 <span className="text-sm text-muted-foreground">USD</span>
               </div>
               <div className="text-right">
                 <div className="flex items-baseline justify-end gap-1">
-                  <span className="text-2xl font-semibold leading-none tracking-tight text-primary">
+                  <span className="text-xl font-bold leading-none tracking-tight text-primary">
                     {pack.credits}
                   </span>
                   <span className="text-sm text-muted-foreground">credits</span>
@@ -165,14 +180,14 @@ export function PurchaseCreditsModal({
             </div>
 
             {discount > 0 && (
-              <div className="mt-element flex items-center justify-center">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+              <div className="mt-3 flex items-center justify-center">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
                   <svg
                     className="h-3 w-3"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
-                    strokeWidth={2}
+                    strokeWidth={2.5}
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   >
@@ -182,72 +197,6 @@ export function PurchaseCreditsModal({
                 </span>
               </div>
             )}
-          </div>
-
-          {/* Slider — 4 snap points */}
-          <div className="mb-group">
-            <input
-              type="range"
-              min={0}
-              max={CREDIT_PACKS.length - 1}
-              step={1}
-              value={packIndex}
-              onChange={(e) => setPackIndex(Number(e.target.value))}
-              aria-label="Credit pack size"
-              className="credit-slider w-full"
-              disabled={submitting}
-              style={{
-                background: `linear-gradient(to right, var(--color-primary) 0%, var(--color-primary) ${
-                  CREDIT_PACKS.length <= 1
-                    ? 0
-                    : (packIndex / (CREDIT_PACKS.length - 1)) * 100
-                }%, var(--color-border) ${
-                  CREDIT_PACKS.length <= 1
-                    ? 0
-                    : (packIndex / (CREDIT_PACKS.length - 1)) * 100
-                }%, var(--color-border) 100%)`,
-              }}
-            />
-            {/* Tick labels */}
-            <div className="mt-tight flex justify-between px-1">
-              {CREDIT_PACKS.map((p, i) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => !submitting && setPackIndex(i)}
-                  disabled={submitting}
-                  className={`flex flex-col items-center gap-0.5 transition-colors ${
-                    i === packIndex
-                      ? "text-foreground"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <span
-                    className={`text-sm font-semibold leading-none ${
-                      i === packIndex ? "text-primary" : ""
-                    }`}
-                  >
-                    ${p.priceCents / 100}
-                  </span>
-                  <span className="text-[10px] uppercase tracking-wider leading-none">
-                    {p.credits}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Pack name + blurb */}
-          <div className="mb-element text-center">
-            <p className="text-sm font-medium text-foreground">
-              {pack.name}
-              {pack.badge && (
-                <span className="ml-2 inline-block rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">
-                  {pack.badge}
-                </span>
-              )}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">{pack.blurb}</p>
           </div>
 
           {/* Error */}
@@ -266,8 +215,19 @@ export function PurchaseCreditsModal({
           >
             {submitting ? (
               <>
-                <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3" />
+                <svg
+                  className="h-4 w-4 animate-spin"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                >
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    strokeOpacity="0.3"
+                  />
                   <path
                     d="M12 2a10 10 0 0 1 10 10"
                     stroke="currentColor"
@@ -278,7 +238,10 @@ export function PurchaseCreditsModal({
                 Redirecting to checkout…
               </>
             ) : (
-              <>Purchase {pack.credits} credits — ${(pack.priceCents / 100).toFixed(0)}</>
+              <>
+                Purchase {pack.credits} credits — $
+                {(pack.priceCents / 100).toFixed(0)}
+              </>
             )}
           </button>
 
@@ -287,50 +250,6 @@ export function PurchaseCreditsModal({
           </p>
         </div>
       </div>
-
-      {/* Slider styling — track + thumb tinted to brand */}
-      <style jsx global>{`
-        .credit-slider {
-          -webkit-appearance: none;
-          appearance: none;
-          height: 6px;
-          border-radius: 9999px;
-          outline: none;
-          cursor: pointer;
-        }
-        .credit-slider::-webkit-slider-thumb {
-          -webkit-appearance: none;
-          appearance: none;
-          width: 22px;
-          height: 22px;
-          border-radius: 9999px;
-          background: var(--color-primary);
-          border: 3px solid #ffffff;
-          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
-          cursor: grab;
-          transition: transform 0.15s ease;
-        }
-        .credit-slider::-webkit-slider-thumb:hover {
-          transform: scale(1.08);
-        }
-        .credit-slider::-webkit-slider-thumb:active {
-          cursor: grabbing;
-          transform: scale(1.04);
-        }
-        .credit-slider::-moz-range-thumb {
-          width: 22px;
-          height: 22px;
-          border-radius: 9999px;
-          background: var(--color-primary);
-          border: 3px solid #ffffff;
-          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
-          cursor: grab;
-        }
-        .credit-slider:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
-      `}</style>
     </div>
   );
 }
