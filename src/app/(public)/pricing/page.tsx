@@ -29,66 +29,80 @@ export default function PricingPage() {
           </p>
         </header>
 
-        {/* Unified pricing card — Figma Variant E */}
-        <section
-          className="overflow-hidden rounded-lg border border-border bg-white"
-          style={{ boxShadow: "var(--shadow-sm)" }}
-        >
-          {/* Body: Starter (left) + Credit packs with slider (right) */}
-          <div className="flex flex-col lg:flex-row">
-            {/* Starter section */}
-            <div className="border-b border-border p-section lg:w-[340px] lg:shrink-0 lg:border-b-0 lg:border-r">
-              <p className="text-xs font-semibold uppercase tracking-wider text-primary">
-                Starter · $0/forever
-              </p>
-              <p className="mt-element text-base font-semibold text-foreground">
-                For one-yard redesigns and trying the tool.
-              </p>
-              <ul className="mt-element space-y-2.5">
-                <FeatureLine>3 design generations on signup</FeatureLine>
-                <FeatureLine>Full plant &amp; hardscape library (550+ items)</FeatureLine>
-                <FeatureLine>In-painting + 16 style presets</FeatureLine>
-                <FeatureLine>Shareable project links</FeatureLine>
-              </ul>
+        {/* Two-card pricing — Figma Variant A (minimal / editorial) */}
+        <section className="grid gap-element lg:grid-cols-2">
+          {/* Starter card */}
+          <div className="flex flex-col rounded-lg border border-border bg-white p-section">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              Starter
+            </p>
+            <div className="mt-element flex items-baseline">
+              <span className="text-2xl font-medium text-foreground">$</span>
+              <span className="text-5xl font-bold leading-none tracking-tight text-foreground">
+                0
+              </span>
+              <span className="ml-2 text-sm text-muted-foreground">/ forever</span>
             </div>
-
-            {/* Credit packs section */}
-            <div className="flex-1 p-section">
-              <p className="text-xs font-semibold uppercase tracking-wider text-primary">
-                Credit packs · $15+ one-time
-              </p>
-              <p className="mt-element text-base font-semibold text-foreground">
-                Pay only for what you use. Credits never expire.
-              </p>
-
-              {/* Slider — inset so edge labels stay inside the card */}
-              <div className="mt-group px-3">
-                <CreditPackSlider
-                  selectedIndex={packIndex}
-                  onChange={setPackIndex}
-                />
-              </div>
-
-              <ul className="mt-group space-y-2.5">
-                <FeatureLine>~1 credit per design generation</FeatureLine>
-                <FeatureLine>8–32 credits per cinematic Veo video</FeatureLine>
-                <FeatureLine>Volume discount up to 17% off</FeatureLine>
-                <FeatureLine>Credits never expire</FeatureLine>
-              </ul>
-            </div>
-          </div>
-
-          {/* CTAs */}
-          <div className="flex flex-wrap items-center gap-tight border-t border-border px-section py-element">
+            <p className="mt-element text-sm text-muted-foreground">
+              For one-yard redesigns and trying the tool.
+            </p>
+            <div className="my-group h-px bg-border" />
+            <ul className="flex-1 space-y-3">
+              <FeatureLine>3 design generations on signup</FeatureLine>
+              <FeatureLine>Full plant &amp; hardscape library (550+ items)</FeatureLine>
+              <FeatureLine>In-painting + 16 style presets</FeatureLine>
+              <FeatureLine>Shareable project links</FeatureLine>
+            </ul>
             <Link
               href="/signup"
-              className="inline-flex h-11 items-center justify-center rounded-md border border-primary bg-white px-5 text-sm font-semibold text-primary transition-colors hover:bg-primary/5"
+              className="mt-group inline-flex h-11 items-center justify-center rounded-md border border-border bg-white text-sm font-semibold text-foreground transition-colors hover:bg-muted"
             >
               Start free
             </Link>
+          </div>
+
+          {/* Credit Packs card */}
+          <div className="flex flex-col rounded-lg border border-border bg-white p-section">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                Credit packs
+              </p>
+              <p className="text-xs font-bold uppercase tracking-[0.12em] text-foreground">
+                Most popular
+              </p>
+            </div>
+            <div className="mt-element flex items-baseline">
+              <span className="text-2xl font-medium text-foreground">$</span>
+              <span className="text-5xl font-bold leading-none tracking-tight text-foreground">
+                15+
+              </span>
+              <span className="ml-2 text-sm text-muted-foreground">
+                / one-time
+              </span>
+            </div>
+            <p className="mt-element text-sm text-muted-foreground">
+              Pay only for what you use. Credits never expire.
+            </p>
+
+            {/* Slider replaces the 4-pack tiles. Inset so edge labels stay
+                inside the card. */}
+            <div className="mt-group px-3">
+              <CreditPackSlider
+                selectedIndex={packIndex}
+                onChange={setPackIndex}
+              />
+            </div>
+
+            <div className="my-group h-px bg-border" />
+            <ul className="flex-1 space-y-3">
+              <FeatureLine>~1 credit per design generation</FeatureLine>
+              <FeatureLine>8–32 credits per cinematic Veo video</FeatureLine>
+              <FeatureLine>Volume discount up to 17% off</FeatureLine>
+              <FeatureLine>Credits never expire</FeatureLine>
+            </ul>
             <Link
               href={`/signup?pack=${selected.id}`}
-              className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-5 text-sm font-semibold text-white transition-colors hover:bg-primary-light"
+              className="mt-group inline-flex h-11 items-center justify-center rounded-md bg-primary text-sm font-semibold text-white transition-colors hover:bg-primary-light"
             >
               Sign up to buy
             </Link>
