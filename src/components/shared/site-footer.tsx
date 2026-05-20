@@ -9,27 +9,22 @@ const FOOTER_LINKS = [
       { label: "Plant library", href: "/#library" },
       { label: "Gallery", href: "/gallery" },
       { label: "Pro dashboard", href: "/dashboard" },
-      { label: "Changelog", href: "/changelog" },
     ],
   },
   {
     heading: "Resources",
     links: [
-      { label: "DIY guides", href: "/guides" },
-      { label: "Plant encyclopedia", href: "/encyclopedia" },
       { label: "Pricing", href: "/pricing" },
-      { label: "API docs", href: "/api-docs" },
-      { label: "Help center", href: "/help" },
+      { label: "FAQ", href: "/faq" },
+      { label: "Contact", href: "/contact" },
+      { label: "For pros", href: "/#audience" },
     ],
   },
   {
-    heading: "Company",
+    heading: "Legal",
     links: [
-      { label: "About", href: "/about" },
-      { label: "Careers", href: "/careers" },
-      { label: "Press", href: "/press" },
-      { label: "For pros", href: "/#audience" },
-      { label: "Contact", href: "/contact" },
+      { label: "Terms of Service", href: "/terms" },
+      { label: "Privacy Policy", href: "/privacy" },
     ],
   },
 ];
@@ -83,8 +78,7 @@ export function SiteFooter() {
         <span className="site-footer-legal">
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>
-          <Link href="/cookies">Cookies</Link>
-          <Link href="/status">Status</Link>
+          <Link href="/contact">Contact</Link>
         </span>
       </div>
     </footer>

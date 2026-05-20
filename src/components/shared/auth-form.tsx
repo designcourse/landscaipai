@@ -234,6 +234,30 @@ export function AuthForm({
               ? "Sign in"
               : "Create account"}
         </button>
+
+        {!isLogin && (
+          <p className="text-center text-xs text-muted-foreground">
+            By creating an account, you agree to our{" "}
+            <a
+              href="/terms"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-primary hover:underline"
+            >
+              Terms of Service
+            </a>{" "}
+            and{" "}
+            <a
+              href="/privacy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-primary hover:underline"
+            >
+              Privacy Policy
+            </a>
+            .
+          </p>
+        )}
       </form>
 
       <p className="text-center text-sm text-muted-foreground">
