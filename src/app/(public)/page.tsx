@@ -3,13 +3,11 @@ import { PwaLandingGuard } from "@/components/shared/pwa-landing-guard";
 import { LandingHero } from "@/components/landing/landing-hero";
 import { LandingLibrary } from "@/components/landing/landing-library";
 import { LandingPlantDetail } from "@/components/landing/landing-plant-detail";
-import { LandingLogos } from "@/components/landing/landing-logos";
 import { LandingVideoTransform } from "@/components/landing/landing-video-transform";
 import { LandingHowItWorks } from "@/components/landing/landing-how-it-works";
 import { LandingGallery } from "@/components/landing/landing-gallery";
 import { LandingShaderReveal } from "@/components/landing/landing-shader-reveal";
 import { LandingAudience } from "@/components/landing/landing-audience";
-import { LandingFeatures } from "@/components/landing/landing-features";
 import { LandingPricing } from "@/components/landing/landing-pricing";
 import { LandingTestimonials } from "@/components/landing/landing-testimonials";
 import { LandingFAQ } from "@/components/landing/landing-faq";
@@ -30,13 +28,11 @@ export default function LandingPage() {
       <LandingHero />
       <LandingLibrary />
       <LandingPlantDetail />
-      <LandingLogos />
       <LandingVideoTransform />
       <LandingHowItWorks />
       <LandingGallery />
       <LandingShaderReveal />
       <LandingAudience />
-      <LandingFeatures />
       <LandingPricing />
       <LandingTestimonials />
       <LandingFAQ />

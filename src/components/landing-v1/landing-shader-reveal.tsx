@@ -275,6 +275,16 @@ export function LandingShaderReveal() {
       </div>
       <div className="sr-stage reveal" ref={stageRef}>
         <canvas ref={canvasRef} />
+        <div className="sr-labels">
+          <span className="sr-chip">
+            <span className="d" />
+            Before
+          </span>
+          <span className="sr-chip after">
+            <span className="d" />
+            After · Modern
+          </span>
+        </div>
         <div className="sr-hint">Move your cursor</div>
       </div>
     </section>

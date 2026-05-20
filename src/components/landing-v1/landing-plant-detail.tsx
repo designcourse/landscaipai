@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import Image from "next/image";
 
 const PLANTS = [
@@ -139,6 +140,14 @@ export function LandingPlantDetail() {
               palettes it fits — Modern, Cottage, Japanese Zen.
             </li>
           </ul>
+          <div className="plant-cta">
+            <Link href="/signup" className="btn btn-primary btn-lg">
+              Browse the catalog
+            </Link>
+            <Link href="/gallery" className="btn btn-ghost btn-lg">
+              See a sample species &rarr;
+            </Link>
+          </div>
         </div>
       </div>
     </section>

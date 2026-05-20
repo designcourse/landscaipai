@@ -230,6 +230,12 @@ export function LandingHero() {
             >
               Start free — 3 credits
             </button>
+            <button type="button" className="btn btn-outline btn-lg">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+              Watch 30-sec demo
+            </button>
           </div>
           <div className="vA-preset-row">
             <span className="label">Try a style</span>
@@ -243,6 +249,24 @@ export function LandingHero() {
                 {p.label}
               </button>
             ))}
+          </div>
+          <div className="trust">
+            <div className="trust-avatars">
+              <span style={{ background: "linear-gradient(135deg,#c8a878,#8a6a4a)" }} />
+              <span style={{ background: "linear-gradient(135deg,#a8c878,#6a8a4a)" }} />
+              <span style={{ background: "linear-gradient(135deg,#78a8c8,#4a6a8a)" }} />
+              <span style={{ background: "linear-gradient(135deg,#c878a8,#8a4a6a)" }} />
+            </div>
+            <div>
+              <div className="trust-stars">★★★★★</div>
+              <div>
+                Trusted by{" "}
+                <strong style={{ color: "var(--ls-fg)", fontWeight: 600 }}>
+                  2,400+
+                </strong>{" "}
+                landscapers &amp; homeowners
+              </div>
+            </div>
           </div>
         </div>
 
