@@ -290,6 +290,11 @@ export function CanvasWorkspace({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
+  // Toolbar "Upload" button opens a chooser card (Take photo / Choose photo)
+  // instead of jumping straight to the OS file picker, which on mobile only
+  // shows existing photos. Same UI as the empty-state card.
+  const [uploadChooserOpen, setUploadChooserOpen] = useState(false);
+
   // Viewport (zoom/pan)
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const {
@@ -1514,11 +1519,19 @@ export function CanvasWorkspace({
   }
 
   function handleUploadClick() {
+    setUploadChooserOpen(false);
     fileInputRef.current?.click();
   }
 
   function handleCameraClick() {
+    setUploadChooserOpen(false);
     cameraInputRef.current?.click();
+  }
+
+  // Toolbar "Upload" button — opens the chooser card instead of jumping
+  // straight to a native file picker.
+  function handleOpenUploadChooser() {
+    setUploadChooserOpen(true);
   }
 
   function handleFileInputChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -1563,7 +1576,7 @@ export function CanvasWorkspace({
           projectId={project.id}
           projectName={project.name}
           credits={credits}
-          onUpload={handleUploadClick}
+          onUpload={handleOpenUploadChooser}
         />
       ) : (
         <CanvasToolbar
@@ -1571,7 +1584,7 @@ export function CanvasWorkspace({
           projectName={project.name}
           credits={credits}
           userProfile={userProfile}
-          onUpload={handleUploadClick}
+          onUpload={handleOpenUploadChooser}
         />
       )}
 
@@ -1945,6 +1958,80 @@ export function CanvasWorkspace({
 
       {/* First-run editor tour */}
       {showOnboarding && <EditorOnboarding onClose={handleCloseOnboarding} />}
+
+      {/* Upload chooser modal — toolbar "Upload" surfaces this instead of
+          opening the native file picker directly, so mobile users can choose
+          between camera capture and existing photos. */}
+      {uploadChooserOpen && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center px-6"
+          style={{ backgroundColor: "rgba(0, 0, 0, 0.5)" }}
+          onClick={() => setUploadChooserOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Upload a photo"
+        >
+          <div
+            className="relative flex w-full max-w-sm flex-col items-center gap-4 rounded-lg border border-border bg-white p-6 text-center"
+            style={{ boxShadow: "var(--shadow-md)" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setUploadChooserOpen(false)}
+              className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              aria-label="Close"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <div
+              className="flex h-14 w-14 items-center justify-center rounded-full"
+              style={{ backgroundColor: "var(--color-credits-badge-bg)" }}
+            >
+              <svg className="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
+              </svg>
+            </div>
+            <div className="space-y-1">
+              <p className="text-base font-semibold text-foreground">Add a photo</p>
+              <p className="text-sm text-muted-foreground">
+                Upload a picture of your home or yard to keep designing.
+              </p>
+            </div>
+            <div className="flex w-full flex-col gap-2">
+              {isMobile && (
+                <button
+                  type="button"
+                  onClick={handleCameraClick}
+                  className="flex h-11 w-full items-center justify-center gap-2 rounded-md bg-primary text-sm font-semibold text-white transition-colors hover:bg-primary-light"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  Take photo
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleUploadClick}
+                className={
+                  isMobile
+                    ? "flex h-11 w-full items-center justify-center gap-2 rounded-md border border-border bg-white text-sm font-semibold text-foreground transition-colors hover:bg-muted"
+                    : "flex h-11 w-full items-center justify-center gap-2 rounded-md bg-primary text-sm font-semibold text-white transition-colors hover:bg-primary-light"
+                }
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
+                </svg>
+                Choose photo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Shimmer animation keyframes */}
       <style jsx global>{`
