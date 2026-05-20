@@ -1,7 +1,7 @@
 /**
- * Generate PWA icons from the leaf mark in public/assets/leaf-mark.svg.
+ * Generate PWA icons from the leaf mark in public/assets/proper-symbol.svg.
  *
- * Renders the SVG (45x38 viewBox) at each target size with sharp/libvips,
+ * Renders the SVG (87x74 viewBox) at each target size with sharp/libvips,
  * preserving aspect ratio and centering on a #0F8000 green square.
  * SVG source guarantees crisp output at any size — no raster upscaling artifacts.
  *
@@ -21,17 +21,18 @@ import sharp from "sharp";
 import * as fs from "fs";
 import * as path from "path";
 
-const SOURCE_SVG = path.resolve(process.cwd(), "public/assets/leaf-mark.svg");
+const SOURCE_SVG = path.resolve(process.cwd(), "public/assets/proper-symbol.svg");
 const OUT_DIR = path.resolve(process.cwd(), "public/icons");
 
 const BG = { r: 15, g: 128, b: 0, alpha: 1 }; // #0F8000
 
-// Native viewBox of leaf-mark.svg
-const SRC_W = 45;
-const SRC_H = 38;
+// Native viewBox of proper-symbol.svg
+const SRC_W = 87;
+const SRC_H = 74;
 
 function loadWhiteSvg(): string {
   const raw = fs.readFileSync(SOURCE_SVG, "utf8");
+  // Source uses fill="white" already; keep currentColor support for any future edits.
   return raw.replace(/fill="currentColor"/g, 'fill="white"');
 }
 

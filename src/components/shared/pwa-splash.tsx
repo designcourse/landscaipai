@@ -145,7 +145,7 @@ export function PwaSplash() {
       <div className="pwa-splash-leaves" ref={layerRef} />
       <div className="pwa-splash-logo">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/icons/leaf-mark-white.png" alt="" width={140} height={118} />
+        <img src="/assets/proper-symbol.svg" alt="" width={174} height={148} />
       </div>
     </div>
   );
