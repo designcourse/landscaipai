@@ -192,13 +192,15 @@ export function ProjectList({ initialProjects }: ProjectListProps) {
             />
           </div>
         )}
-        <button
-          onClick={() => setShowCreate(true)}
-          className="inline-flex items-center justify-center gap-tight rounded-md bg-primary px-element py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-light"
-        >
-          <PlusIcon className="h-3.5 w-3.5" />
-          New Project
-        </button>
+        {hasProjects && (
+          <button
+            onClick={() => setShowCreate(true)}
+            className="inline-flex items-center justify-center gap-tight rounded-md bg-primary px-element py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-light"
+          >
+            <PlusIcon className="h-3.5 w-3.5" />
+            New Project
+          </button>
+        )}
       </div>
 
       {/* Create form */}
