@@ -24,7 +24,11 @@ interface CanvasMobileDockProps {
   onGenerate: () => void;
   onOpenLibrary: () => void;
   onOpenVideoModal: () => void;
-  videoButtonState: "disabled-no-selection" | "disabled-aspect-mismatch" | "enabled";
+  videoButtonState:
+    | "disabled-not-enough-frames"
+    | "disabled-no-selection"
+    | "disabled-aspect-mismatch"
+    | "enabled";
   generating: boolean;
   credits: number;
   hasSelection: boolean;

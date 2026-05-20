@@ -30,7 +30,11 @@ interface CanvasBottomBarProps {
   onOpenLibrary: () => void;
   // Video generation
   onOpenVideoModal: () => void;
-  videoButtonState: "disabled-no-selection" | "disabled-aspect-mismatch" | "enabled";
+  videoButtonState:
+    | "disabled-not-enough-frames"
+    | "disabled-no-selection"
+    | "disabled-aspect-mismatch"
+    | "enabled";
   generating: boolean;
   credits: number;
   hasSelection: boolean;
@@ -510,18 +514,24 @@ function VideoButton({
   state,
   onClick,
 }: {
-  state: "disabled-no-selection" | "disabled-aspect-mismatch" | "enabled";
+  state:
+    | "disabled-not-enough-frames"
+    | "disabled-no-selection"
+    | "disabled-aspect-mismatch"
+    | "enabled";
   onClick: () => void;
 }) {
   const [tooltipOpen, setTooltipOpen] = useState(false);
   const disabled = state !== "enabled";
 
   const tooltipText =
-    state === "disabled-no-selection"
-      ? "Select 2 images"
-      : state === "disabled-aspect-mismatch"
-        ? "Images must match aspect ratio"
-        : "";
+    state === "disabled-not-enough-frames"
+      ? "Need 2 images on the canvas"
+      : state === "disabled-no-selection"
+        ? "Select 2 images"
+        : state === "disabled-aspect-mismatch"
+          ? "Images must match aspect ratio"
+          : "";
 
   return (
     <div

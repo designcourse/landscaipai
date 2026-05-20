@@ -788,20 +788,32 @@ export function CanvasWorkspace({
     return { start: ordered[0], end: ordered[1] };
   }, [selectionOrder, selectedItemIds, canvasItems]);
 
+  // How many items on the canvas could serve as a video frame (originals +
+  // generations). Videos need 2 distinct frames, so anything below 2 should
+  // disable the video CTA outright.
+  const videoCandidateCount = useMemo(
+    () => canvasItems.filter((i) => i.type !== "video" && i.type !== "finalized_video").length,
+    [canvasItems]
+  );
+
   // Button state: needs 2 items, same aspect ratio (within 1% tolerance)
-  const videoButtonState: "disabled-no-selection" | "disabled-aspect-mismatch" | "enabled" =
-    useMemo(() => {
-      if (!videoFrames) return "disabled-no-selection";
-      const s = videoFrames.start;
-      const e = videoFrames.end;
-      if (!s.naturalWidth || !s.naturalHeight || !e.naturalWidth || !e.naturalHeight) {
-        return "disabled-aspect-mismatch";
-      }
-      const sr = s.naturalWidth / s.naturalHeight;
-      const er = e.naturalWidth / e.naturalHeight;
-      if (Math.abs(sr - er) > 0.01) return "disabled-aspect-mismatch";
-      return "enabled";
-    }, [videoFrames]);
+  const videoButtonState:
+    | "disabled-not-enough-frames"
+    | "disabled-no-selection"
+    | "disabled-aspect-mismatch"
+    | "enabled" = useMemo(() => {
+    if (videoCandidateCount < 2) return "disabled-not-enough-frames";
+    if (!videoFrames) return "disabled-no-selection";
+    const s = videoFrames.start;
+    const e = videoFrames.end;
+    if (!s.naturalWidth || !s.naturalHeight || !e.naturalWidth || !e.naturalHeight) {
+      return "disabled-aspect-mismatch";
+    }
+    const sr = s.naturalWidth / s.naturalHeight;
+    const er = e.naturalWidth / e.naturalHeight;
+    if (Math.abs(sr - er) > 0.01) return "disabled-aspect-mismatch";
+    return "enabled";
+  }, [videoFrames, videoCandidateCount]);
 
   function handleOpenVideoModal() {
     if (videoButtonState !== "enabled") return;
@@ -1472,12 +1484,26 @@ export function CanvasWorkspace({
     addItemPosition(imageRecord.id, { x: newX, y: newY, width, height });
     handleSelectItem(imageRecord.id);
 
-    // Center the viewport on the newly placed image
+    // Frame the newly placed image in the viewport — fit-to-screen with
+    // padding, capped at 1.0 so we never upscale beyond natural size. This
+    // overrides any persisted zoom that may have left the image cropped.
     if (container) {
       const rect = container.getBoundingClientRect();
-      const panX = -newX + (rect.width / 2) / viewport.zoom - width / 2;
-      const panY = -newY + (rect.height / 2) / viewport.zoom - height / 2;
-      setViewport({ ...viewport, panX, panY });
+      const FIT_PADDING = 0.85; // leave ~15% margin around the image
+      const VIEWPORT_MIN_ZOOM = 0.1;
+      const VIEWPORT_MAX_ZOOM = 3.0;
+      const fitZoom = Math.min(
+        (rect.width * FIT_PADDING) / width,
+        (rect.height * FIT_PADDING) / height,
+        1
+      );
+      const targetZoom = Math.max(
+        VIEWPORT_MIN_ZOOM,
+        Math.min(VIEWPORT_MAX_ZOOM, fitZoom)
+      );
+      const panX = rect.width / (2 * targetZoom) - newX - width / 2;
+      const panY = rect.height / (2 * targetZoom) - newY - height / 2;
+      setViewport({ zoom: targetZoom, panX, panY });
     }
 
     // On mobile, surface the Prompt panel automatically so the user can
@@ -1702,7 +1728,9 @@ export function CanvasWorkspace({
               primarySelectedId ? () => handleRequestDelete(primarySelectedId) : undefined
             }
             onOpenVideoPicker={
-              primarySelectedId ? () => setVideoPickerOpen(true) : undefined
+              primarySelectedId && videoCandidateCount >= 2
+                ? () => setVideoPickerOpen(true)
+                : undefined
             }
             openPromptSignal={openPromptSignal}
           />
