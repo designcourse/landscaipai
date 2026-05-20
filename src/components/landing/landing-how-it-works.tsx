@@ -7,7 +7,7 @@ const STEPS = [
     n: "01",
     title: "Upload a photo of your yard",
     body:
-      "Any phone photo works. We detect the house, driveway, fence, and existing plants automatically.",
+      "Any clear, daytime phone photo works. JPEG, PNG, or HEIC.",
     label: "Upload screen · placeholder",
   },
   {
