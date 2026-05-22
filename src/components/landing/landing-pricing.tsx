@@ -1,24 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { CREDIT_PACKS } from "@/lib/stripe/config";
+import { useEffect, useMemo, useState } from "react";
+import { useCreditPacks } from "@/hooks/use-credit-packs";
 import { createClient } from "@/lib/supabase/client";
 import { usePurchaseCredits } from "@/components/billing/purchase-credits-modal-context";
 import { useAuthModal } from "@/components/shared/auth-modal-context";
 import { CreditPackSlider } from "@/components/billing/credit-pack-slider";
 
-const POPULAR_INDEX = Math.max(
-  0,
-  CREDIT_PACKS.findIndex((p) => p.badge === "Most popular")
-);
-
 export function LandingPricing() {
   const { open: openCredits } = usePurchaseCredits();
   const { openModal } = useAuthModal();
+  const { packs } = useCreditPacks();
+  const popularIndex = useMemo(() => {
+    const idx = packs.findIndex((p) => p.badge === "Most popular");
+    return idx >= 0 ? idx : Math.min(1, packs.length - 1);
+  }, [packs]);
   const [authed, setAuthed] = useState<boolean | null>(null);
-  const [packIndex, setPackIndex] = useState(
-    POPULAR_INDEX >= 0 ? POPULAR_INDEX : 1
-  );
+  const [packIndex, setPackIndex] = useState(0);
+  useEffect(() => {
+    setPackIndex(popularIndex);
+  }, [popularIndex]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -112,7 +113,9 @@ export function LandingPricing() {
           <div className="mt-element flex items-baseline">
             <span className="text-2xl font-medium text-foreground">$</span>
             <span className="text-5xl font-bold leading-none tracking-tight text-foreground">
-              15+
+              {packs.length > 0
+                ? `${Math.min(...packs.map((p) => p.priceCents / 100))}+`
+                : "—"}
             </span>
             <span className="ml-2 text-base text-muted-foreground">/ one-time</span>
           </div>

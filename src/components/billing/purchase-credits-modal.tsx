@@ -1,11 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import {
-  CREDIT_PACKS,
-  discountPercent,
-  pricePerCredit,
-} from "@/lib/stripe/config";
+import { discountPercent, pricePerCredit } from "@/lib/stripe/config";
+import { useCreditPacks } from "@/hooks/use-credit-packs";
 import { CreditPackSlider } from "./credit-pack-slider";
 
 interface PurchaseCreditsModalProps {
@@ -21,11 +18,6 @@ interface PurchaseCreditsModalProps {
   subtitle?: string;
 }
 
-const DEFAULT_PACK_INDEX = Math.max(
-  0,
-  CREDIT_PACKS.findIndex((p) => p.badge === "Most popular")
-);
-
 export function PurchaseCreditsModal({
   open,
   onClose,
@@ -34,20 +26,29 @@ export function PurchaseCreditsModal({
   title,
   subtitle,
 }: PurchaseCreditsModalProps) {
-  const [packIndex, setPackIndex] = useState(
-    DEFAULT_PACK_INDEX >= 0 ? DEFAULT_PACK_INDEX : 1
-  );
+  const { packs } = useCreditPacks();
+  const popularIndex = useMemo(() => {
+    const idx = packs.findIndex((p) => p.badge === "Most popular");
+    return idx >= 0 ? idx : Math.min(1, packs.length - 1);
+  }, [packs]);
+  const [packIndex, setPackIndex] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const pack = CREDIT_PACKS[packIndex];
-  const perCredit = useMemo(() => pricePerCredit(pack), [pack]);
-  const discount = useMemo(() => discountPercent(pack), [pack]);
+  const pack = packs[Math.min(packIndex, packs.length - 1)];
+  const perCredit = useMemo(
+    () => (pack ? pricePerCredit(pack) : 0),
+    [pack]
+  );
+  const discount = useMemo(
+    () => (pack ? discountPercent(pack, packs) : 0),
+    [pack, packs]
+  );
 
   // Reset selection + lock body scroll when opening
   useEffect(() => {
     if (!open) return;
-    setPackIndex(DEFAULT_PACK_INDEX >= 0 ? DEFAULT_PACK_INDEX : 1);
+    setPackIndex(popularIndex);
     setError(null);
     setSubmitting(false);
     const original = document.body.style.overflow;
@@ -55,7 +56,7 @@ export function PurchaseCreditsModal({
     return () => {
       document.body.style.overflow = original;
     };
-  }, [open]);
+  }, [open, popularIndex]);
 
   // Esc to close
   useEffect(() => {
@@ -68,9 +69,10 @@ export function PurchaseCreditsModal({
   }, [open, onClose, submitting]);
 
   if (!open) return null;
+  if (!pack) return null;
 
   async function handlePurchase() {
-    if (submitting) return;
+    if (submitting || !pack) return;
     setSubmitting(true);
     setError(null);
 

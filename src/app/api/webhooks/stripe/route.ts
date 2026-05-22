@@ -3,6 +3,7 @@ import type Stripe from "stripe";
 import { createStripeClient } from "@/lib/stripe/client";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { findCreditPack } from "@/lib/stripe/config";
+import { findResolvedPack } from "@/lib/billing/packs";
 
 /**
  * POST /api/webhooks/stripe
@@ -79,17 +80,29 @@ async function handleCheckoutCompleted(event: Stripe.Event) {
     return;
   }
 
-  // Verify the credits granted match what the pack actually offers — defends
-  // against tampered metadata in the off-chance the session is forged.
+  // Pack id must reference a real pack (default or one with overrides).
   const pack = findCreditPack(packId);
   if (!pack) {
     console.warn(`[stripe webhook] unknown pack_id ${packId}`);
     return;
   }
-  const credits = pack.credits;
-  if (Number(creditsRaw) !== credits) {
+
+  // Trust the metadata credit count: the session was created by our own
+  // checkout API with the resolved (override-aware) credit count, and the
+  // webhook signature is verified above so this value is tamper-proof.
+  // Sanity-check it against the current resolved pack and log if it has
+  // drifted (e.g. admin changed the override between checkout and fulfillment).
+  const credits = Number(creditsRaw);
+  if (!Number.isInteger(credits) || credits < 1) {
     console.warn(
-      `[stripe webhook] credits mismatch for pack ${packId}: metadata=${creditsRaw} expected=${credits}`
+      `[stripe webhook] invalid credits metadata for pack ${packId}: ${creditsRaw}`
+    );
+    return;
+  }
+  const resolved = await findResolvedPack(packId);
+  if (resolved && resolved.credits !== credits) {
+    console.warn(
+      `[stripe webhook] credits drift for pack ${packId}: granted=${credits} current_resolved=${resolved.credits}`
     );
   }
 

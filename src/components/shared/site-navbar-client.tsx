@@ -11,7 +11,7 @@ import type { Profile } from "@/types";
 
 type NavbarProfile = Pick<
   Profile,
-  "full_name" | "credits_balance" | "avatar_url" | "email"
+  "full_name" | "credits_balance" | "avatar_url" | "email" | "user_type"
 > | null;
 
 interface SiteNavbarClientProps {
@@ -156,6 +156,15 @@ export function SiteNavbarClient({ user, profile }: SiteNavbarClientProps) {
                   >
                     Account settings
                   </Link>
+                  {profile?.user_type === "admin" && (
+                    <Link
+                      href="/admin/general"
+                      onClick={() => setDropdownOpen(false)}
+                      role="menuitem"
+                    >
+                      Admin
+                    </Link>
+                  )}
                   <button
                     type="button"
                     onClick={handleSignOut}
@@ -246,6 +255,11 @@ export function SiteNavbarClient({ user, profile }: SiteNavbarClientProps) {
                 <Link href="/account" onClick={closeMobile}>
                   Account settings
                 </Link>
+                {profile?.user_type === "admin" && (
+                  <Link href="/admin/general" onClick={closeMobile}>
+                    Admin
+                  </Link>
+                )}
                 <button
                   type="button"
                   onClick={() => {

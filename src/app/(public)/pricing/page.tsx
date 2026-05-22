@@ -1,20 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { CREDIT_PACKS } from "@/lib/stripe/config";
+import { useEffect, useMemo, useState } from "react";
+import { useCreditPacks } from "@/hooks/use-credit-packs";
 import { CreditPackSlider } from "@/components/billing/credit-pack-slider";
 
-const POPULAR_INDEX = Math.max(
-  0,
-  CREDIT_PACKS.findIndex((p) => p.badge === "Most popular")
-);
-
 export default function PricingPage() {
-  const [packIndex, setPackIndex] = useState(
-    POPULAR_INDEX >= 0 ? POPULAR_INDEX : 1
-  );
-  const selected = CREDIT_PACKS[packIndex];
+  const { packs } = useCreditPacks();
+  const popularIndex = useMemo(() => {
+    const idx = packs.findIndex((p) => p.badge === "Most popular");
+    return idx >= 0 ? idx : Math.min(1, packs.length - 1);
+  }, [packs]);
+  const [packIndex, setPackIndex] = useState(0);
+  useEffect(() => {
+    setPackIndex(popularIndex);
+  }, [popularIndex]);
+  const selected = packs[Math.min(packIndex, packs.length - 1)] ?? packs[0];
 
   return (
     <main className="bg-background">
@@ -74,7 +75,7 @@ export default function PricingPage() {
             <div className="mt-element flex items-baseline">
               <span className="text-2xl font-medium text-foreground">$</span>
               <span className="text-5xl font-bold leading-none tracking-tight text-foreground">
-                15+
+                {Math.min(...packs.map((p) => p.priceCents / 100))}+
               </span>
               <span className="ml-2 text-base text-muted-foreground">
                 / one-time

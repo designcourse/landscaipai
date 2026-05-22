@@ -1,6 +1,6 @@
 "use client";
 
-import { CREDIT_PACKS } from "@/lib/stripe/config";
+import { useCreditPacks } from "@/hooks/use-credit-packs";
 
 interface CreditPackSliderProps {
   selectedIndex: number;
@@ -23,7 +23,8 @@ export function CreditPackSlider({
   onChange,
   disabled = false,
 }: CreditPackSliderProps) {
-  const total = CREDIT_PACKS.length;
+  const { packs } = useCreditPacks();
+  const total = packs.length;
   const ratio =
     total <= 1 ? 0 : Math.max(0, Math.min(1, selectedIndex / (total - 1)));
   // Filled track spans from the first dot center (12.5%) to the active dot
@@ -55,7 +56,8 @@ export function CreditPackSlider({
     if (next !== selectedIndex) onChange(next);
   }
 
-  const active = CREDIT_PACKS[selectedIndex];
+  const active = packs[selectedIndex];
+  if (!active) return null;
 
   return (
     <div
@@ -73,7 +75,7 @@ export function CreditPackSlider({
     >
       {/* Price labels row */}
       <div className="grid grid-cols-4">
-        {CREDIT_PACKS.map((p, i) => {
+        {packs.map((p, i) => {
           const isActive = i === selectedIndex;
           return (
             <button
@@ -110,7 +112,7 @@ export function CreditPackSlider({
         />
         {/* Dots overlay — grid keeps each dot centered in its column */}
         <div className="absolute inset-0 grid grid-cols-4">
-          {CREDIT_PACKS.map((p, i) => {
+          {packs.map((p, i) => {
             const isActive = i === selectedIndex;
             const isBehind = i < selectedIndex;
             return (
@@ -141,7 +143,7 @@ export function CreditPackSlider({
 
       {/* Credit labels row */}
       <div className="mt-3 grid grid-cols-4">
-        {CREDIT_PACKS.map((p, i) => {
+        {packs.map((p, i) => {
           const isActive = i === selectedIndex;
           return (
             <div

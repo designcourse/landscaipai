@@ -70,12 +70,21 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  // Admin route check
+  // Admin route check — gate at the middleware level (fast redirect) and again
+  // in the admin layout (defense in depth). Non-admins go to the dashboard so
+  // they don't bounce-loop on /login.
   if (adminRoutes.some((route) => pathname.startsWith(route))) {
     if (!user) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
-    // TODO: Check user_type === 'admin' from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("user_type")
+      .eq("id", user.id)
+      .single();
+    if (profile?.user_type !== "admin") {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
   }
 
   return response;

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createStripeClient } from "@/lib/stripe/client";
-import { findCreditPack } from "@/lib/stripe/config";
+import { findResolvedPack } from "@/lib/billing/packs";
 
 /**
  * POST /api/billing/checkout
@@ -34,7 +34,10 @@ export async function POST(request: Request) {
   if (!body.packId) {
     return NextResponse.json({ error: "Missing packId" }, { status: 400 });
   }
-  const pack = findCreditPack(body.packId);
+  // Resolve against admin overrides (admin_settings.credit_pack_overrides) so
+  // the price + credits we send to Stripe match what the pricing UI shows and
+  // what the webhook will grant.
+  const pack = await findResolvedPack(body.packId);
   if (!pack) {
     return NextResponse.json({ error: "Unknown pack" }, { status: 400 });
   }

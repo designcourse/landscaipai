@@ -66,11 +66,19 @@ export function pricePerCredit(pack: CreditPack): number {
   return pack.priceCents / 100 / pack.credits;
 }
 
-/** Discount % vs. the smallest pack's per-credit price. */
-export function discountPercent(pack: CreditPack): number {
-  const base = CREDIT_PACKS[0];
-  if (pack.id === base.id) return 0;
+/**
+ * Discount % vs. the smallest pack's per-credit price. Pass a resolved pack
+ * list when admin pricing overrides are in play; defaults to CREDIT_PACKS so
+ * existing callers keep working.
+ */
+export function discountPercent(
+  pack: CreditPack,
+  packs: readonly CreditPack[] = CREDIT_PACKS
+): number {
+  const base = packs[0];
+  if (!base || pack.id === base.id) return 0;
   const basePer = pricePerCredit(base);
   const thisPer = pricePerCredit(pack);
+  if (basePer <= 0) return 0;
   return Math.round(((basePer - thisPer) / basePer) * 100);
 }
