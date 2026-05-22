@@ -25,12 +25,12 @@ export default function LandingPage() {
     <main className="landing-root">
       <PwaLandingGuard />
       <LandingHero />
+      <LandingGallery />
+      <LandingVideoTransform />
+      <LandingShaderReveal />
       <LandingLibrary />
       <LandingPlantDetail />
-      <LandingVideoTransform />
       <LandingHowItWorks />
-      <LandingGallery />
-      <LandingShaderReveal />
       <LandingAudience />
       <LandingPricing />
       <LandingFAQ />
