@@ -88,6 +88,26 @@ export async function POST(request: Request) {
   const stripe = createStripeClient();
 
   let customerId = profile.stripe_customer_id as string | null;
+
+  // Validate the stored customer still exists in the current Stripe account /
+  // mode. A customer created in test mode does not exist in live mode (and
+  // vice-versa), and customers can also be deleted in the dashboard. In any
+  // of those cases we transparently create a fresh customer and overwrite
+  // the stale id on the profile.
+  if (customerId) {
+    try {
+      const existing = await stripe.customers.retrieve(customerId);
+      if (existing.deleted) customerId = null;
+    } catch (err) {
+      const code = (err as { code?: string } | null)?.code;
+      if (code === "resource_missing") {
+        customerId = null;
+      } else {
+        throw err;
+      }
+    }
+  }
+
   if (!customerId) {
     const customer = await stripe.customers.create({
       email: profile.email || user.email || undefined,
