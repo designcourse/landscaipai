@@ -18,7 +18,14 @@ interface PurchaseCreditsModalProps {
   subtitle?: string;
 }
 
-export function PurchaseCreditsModal({
+export function PurchaseCreditsModal(props: PurchaseCreditsModalProps) {
+  // Mount the inner content only while open so `useCreditPacks()` re-runs on
+  // every open — admin pricing overrides propagate without a page reload.
+  if (!props.open) return null;
+  return <PurchaseCreditsModalInner {...props} />;
+}
+
+function PurchaseCreditsModalInner({
   open,
   onClose,
   successUrl,
@@ -68,7 +75,6 @@ export function PurchaseCreditsModal({
     return () => window.removeEventListener("keydown", handleKey);
   }, [open, onClose, submitting]);
 
-  if (!open) return null;
   if (!pack) return null;
 
   async function handlePurchase() {
