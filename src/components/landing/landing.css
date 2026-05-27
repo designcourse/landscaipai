@@ -158,7 +158,523 @@
 }
 
 /* ==========================================================
-   §1 HERO (Variant A — split copy + before/after slider)
+   §1 HERO (3D — Three.js shader transition between styles)
+   ========================================================== */
+
+.landing-root .hero-3d {
+  position: relative;
+  background: transparent;
+  overflow: visible;
+  padding: 56px 0 0;
+  z-index: 2;
+  margin-bottom: -220px;
+  /* Hero-bg knobs.  Lifted to custom properties on the real .hero-3d
+     element so they show up as live-editable swatches in Chrome's
+     Styles panel (the ::before pseudo-element's color values aren't
+     directly pickable). */
+  --hero-bg-top: #f5efe1;
+  --hero-bg-bottom: #fbf9f5;
+  --hero-bg-fade-stop: 30%;
+}
+.landing-root .hero-3d::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(100% - 220px);
+  background: linear-gradient(
+    to bottom,
+    var(--hero-bg-top) 0%,
+    var(--hero-bg-bottom) var(--hero-bg-fade-stop),
+    var(--hero-bg-bottom) 100%
+  );
+  z-index: -1;
+}
+.landing-root .hero-3d-inner {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 0 40px;
+  position: relative;
+}
+
+/* ==========================================================
+   Drifting clouds behind the headline.  SVG ellipses chewed
+   up by feTurbulence + feDisplacementMap give organic edges
+   without shipping any image assets.
+   ========================================================== */
+.landing-root .hero-3d-clouds {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  /* Break out of the inner's max-width (1320px) so the clouds drift
+     across the full viewport, not just the centered copy column.
+     Combined with left:50% + translateX(-50%) this re-centers a
+     viewport-wide layer on the inner's centerline. */
+  left: 50%;
+  width: 100vw;
+  transform: translateX(-50%);
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+}
+.landing-root .hero-3d-cloud {
+  position: absolute;
+  height: auto;
+  will-change: transform;
+  filter: drop-shadow(0 6px 14px rgba(255, 255, 255, 0.35));
+}
+.landing-root .hero-3d-cloud svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+@keyframes hero-3d-cloud-drift {
+  from { transform: translate3d(calc(-100% - 8vw), 0, 0); }
+  to   { transform: translate3d(calc(100vw + 8vw), 0, 0); }
+}
+.landing-root .hero-3d-cloud--a {
+  top: 4%;
+  width: 360px;
+  opacity: 0.92;
+  animation: hero-3d-cloud-drift 110s linear infinite;
+  animation-delay: -12s;
+}
+.landing-root .hero-3d-cloud--b {
+  top: 26%;
+  width: 480px;
+  opacity: 0.78;
+  animation: hero-3d-cloud-drift 175s linear infinite;
+  animation-delay: -95s;
+}
+.landing-root .hero-3d-cloud--c {
+  top: 52%;
+  width: 280px;
+  opacity: 0.85;
+  animation: hero-3d-cloud-drift 130s linear infinite;
+  animation-delay: -38s;
+}
+.landing-root .hero-3d-cloud--d {
+  top: 70%;
+  width: 400px;
+  opacity: 0.7;
+  animation: hero-3d-cloud-drift 200s linear infinite;
+  animation-delay: -150s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing-root .hero-3d-cloud {
+    animation: none;
+    transform: translateX(20vw);
+  }
+}
+
+/* Butterflies (orbital-flutter technique):
+   - .hero-butterfly-wrap is JS-driven (translate3d into the hover-zone
+     during the fly-in, then re-anchored to the CTA on resize).
+   - Inside, .bfly-swarm holds two .bfly clusters at fixed offsets so
+     they hover side-by-side around the button.
+   - Each .bfly nests five transform layers (squish → orbit → oval →
+     counter → wings) that combine into a flattened oval orbital path
+     while the wings stay screen-upright.
+   - .bfly-wings is two radial-gradient blobs (upper + lower) rapidly
+     scale-flipped to fake the wing flap. */
+.landing-root .hero-butterfly-stage {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 4;
+}
+.landing-root .hero-butterfly-wrap {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  will-change: transform;
+}
+.landing-root .bfly-swarm {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+}
+/* Once the cluster arrives over the CTA the swarm itself slowly drifts
+   so the pair of butterflies wanders around the hover zone instead of
+   feeling pinned to one spot. */
+.landing-root .hero-butterfly-stage.is-hovering .bfly-swarm {
+  animation: bfly-swarm-drift 14s ease-in-out infinite alternate;
+}
+@keyframes bfly-swarm-drift {
+  0%   { transform: translate(-22px, 8px); }
+  50%  { transform: translate(18px, -18px); }
+  100% { transform: translate(-12px, 14px); }
+}
+
+/* Cluster — positioned offset from the swarm center.  The two
+   butterflies use slight different offsets so they don't overlap. */
+.landing-root .bfly {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+.landing-root .bfly--a { transform: translate(-46px, -28px); }
+.landing-root .bfly--b { transform: translate(48px, -10px); }
+.landing-root .bfly--c { transform: translate(6px, -52px); }
+
+/* Horizontal squish flattens the otherwise-circular orbit into a long
+   shallow oval — reads as the butterfly flitting forward instead of
+   tracing a literal circle in the air. */
+.landing-root .bfly-squish {
+  transform: scale(0.7, 1);
+}
+
+/* Outer orbital rotation.  Each butterfly gets its own period so they
+   never sync up. */
+.landing-root .bfly-orbit {
+  position: absolute;
+}
+.landing-root .bfly--a .bfly-orbit {
+  animation: bfly-orbit-rot 9s linear infinite;
+}
+.landing-root .bfly--b .bfly-orbit {
+  animation: bfly-orbit-rot 12s linear infinite reverse;
+}
+.landing-root .bfly--c .bfly-orbit {
+  animation: bfly-orbit-rot 7s linear infinite;
+}
+
+/* Offset from orbit center + counter-rotation with a horizontal scale
+   warps the circle into the elongated oval we actually want to see. */
+.landing-root .bfly-oval {
+  position: absolute;
+  left: 38px;
+  top: 0;
+}
+.landing-root .bfly--a .bfly-oval {
+  animation: bfly-oval-counter 1.4s linear infinite;
+}
+.landing-root .bfly--b .bfly-oval {
+  animation: bfly-oval-counter 1.7s linear infinite;
+}
+.landing-root .bfly--c .bfly-oval {
+  animation: bfly-oval-counter 1.1s linear infinite;
+}
+
+/* Counter-rotates the outer orbit so the wing pattern itself always
+   reads "right-side-up" regardless of where it is in the orbit. */
+.landing-root .bfly-counter {
+  position: absolute;
+}
+.landing-root .bfly--a .bfly-counter {
+  animation: bfly-counter-rot 9s linear infinite;
+}
+.landing-root .bfly--b .bfly-counter {
+  animation: bfly-counter-rot 12s linear infinite reverse;
+}
+.landing-root .bfly--c .bfly-counter {
+  animation: bfly-counter-rot 7s linear infinite;
+}
+
+/* The wing pattern itself — two radial-gradient blobs (upper + lower
+   wing lobes), scaled & rotated/flipped on a fast timer to fake the
+   flap.  Brand greens stacked: brighter upper, deeper lower.  Kept
+   small on purpose so the two-blob silhouette reads as one butterfly
+   instead of "two ovals stacked". */
+.landing-root .bfly-wings {
+  width: 16px;
+  height: 13px;
+  margin-left: -8px;
+  margin-top: -6.5px;
+  background:
+    radial-gradient(closest-side at 50% 50%, #0F8000 50%, transparent 51%),
+    radial-gradient(closest-side at 50% 50%, #0F8000 50%, transparent 51%);
+  background-repeat: no-repeat;
+  background-size: 92% 70%, 100% 70%;
+  background-position: 20% -38%, 0 42%;
+  animation: bfly-flap 170ms ease-in-out infinite alternate-reverse;
+}
+.landing-root .bfly--b .bfly-wings {
+  width: 12px;
+  height: 10px;
+  margin-left: -6px;
+  margin-top: -5px;
+  animation-duration: 140ms;
+}
+.landing-root .bfly--c .bfly-wings {
+  width: 9px;
+  height: 7px;
+  margin-left: -4.5px;
+  margin-top: -3.5px;
+  animation-duration: 120ms;
+}
+
+@keyframes bfly-orbit-rot {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+@keyframes bfly-oval-counter {
+  0%   { transform: rotate(0deg) scale(3.2, 1); }
+  100% { transform: rotate(-360deg) scale(3.2, 1); }
+}
+@keyframes bfly-counter-rot {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(-360deg); }
+}
+/* Flap keyframes — both ends keep the wings horizontally compressed
+   so they never read as "fully spread flat".  X scale stays in the
+   0.5–0.78 range; the Y flip + small rotation gives the flapping
+   illusion without ever showing a flat, top-down profile. */
+@keyframes bfly-flap {
+  0%   { transform: scale(0.78, 1) rotate(28deg); }
+  100% { transform: scale(0.5, -1) rotate(-28deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-root .bfly-swarm,
+  .landing-root .bfly-orbit,
+  .landing-root .bfly-oval,
+  .landing-root .bfly-counter,
+  .landing-root .bfly-wings {
+    animation: none;
+  }
+}
+
+.landing-root .hero-3d-copy {
+  text-align: center;
+  max-width: 1040px;
+  margin: 0 auto 16px;
+  position: relative;
+  z-index: 1;
+}
+.landing-root .hero-3d-copy .eyebrow {
+  margin: 0 auto 22px;
+}
+.landing-root .hero-3d-copy h1 {
+  font-size: clamp(40px, 5.8vw, 76px);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.04;
+  margin: 0 0 54px;
+  color: var(--ls-fg);
+  text-wrap: balance;
+}
+.landing-root .hero-3d-copy h1 .hero-3d-emph {
+  color: var(--ls-primary);
+}
+.landing-root .hero-3d-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 40px;
+  align-items: center;
+  max-width: 880px;
+  margin: 0 auto;
+}
+.landing-root .hero-3d-sub {
+  text-align: left;
+  font-size: 17px;
+  line-height: 1.5;
+  color: var(--ls-muted-fg);
+  margin: 0;
+}
+.landing-root .hero-3d-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 22px;
+  font-size: 16px;
+  white-space: nowrap;
+}
+.landing-root .hero-3d-cta-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  opacity: 0.92;
+}
+.landing-root .hero-3d-cta-meta svg {
+  flex-shrink: 0;
+}
+
+.landing-root .hero-3d-stage-wrap {
+  position: relative;
+  max-width: 1640px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+.landing-root .hero-3d-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 7;
+  max-height: 720px;
+  margin: 0 auto;
+  overflow: visible;
+  border-radius: 0;
+  background: transparent;
+  touch-action: pan-y;
+  pointer-events: auto;
+}
+.landing-root .hero-3d-stage canvas {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+}
+.landing-root .hero-3d-placeholder {
+  /* Hidden by default — kept in the DOM only so the browser prefetches
+     the Before WebP while Three.js is loading.  The visible "Before"
+     image is rendered by the shader, which animates it in via the
+     selected transition once the renderer is ready. */
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 0;
+}
+.landing-root .hero-3d-stage canvas {
+  z-index: 1;
+  /* Canvas starts hidden; the .is-ready class is added by the hero
+     component once the first WebGL frame has rendered, fading the
+     Before image into view instead of letting it pop in. */
+  opacity: 0;
+  transition: opacity 0.7s ease;
+}
+.landing-root .hero-3d-stage canvas.is-ready {
+  opacity: 1;
+}
+
+.landing-root .hero-3d-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 46px;
+  height: 46px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--ls-border);
+  color: var(--ls-fg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 3;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+  opacity: 0.85;
+}
+.landing-root .hero-3d-nav:hover {
+  background: #fff;
+  opacity: 1;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+}
+.landing-root .hero-3d-nav:active {
+  transform: translateY(-50%) scale(0.94);
+}
+.landing-root .hero-3d-nav-prev {
+  left: 16px;
+}
+.landing-root .hero-3d-nav-next {
+  right: 16px;
+}
+
+.landing-root .hero-3d-label {
+  position: absolute;
+  left: 50%;
+  bottom: 240px;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid var(--ls-border);
+  border-radius: 9999px;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.08);
+  z-index: 3;
+  pointer-events: none;
+  animation: hero-3d-label-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.landing-root .hero-3d-label .ls-label {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+}
+.landing-root .hero-3d-label-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ls-primary-dark, var(--ls-primary));
+  letter-spacing: -0.005em;
+}
+@keyframes hero-3d-label-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 12px);
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+    filter: blur(0);
+  }
+}
+
+@media (max-width: 960px) {
+  .landing-root .hero-3d {
+    padding: 32px 0 24px;
+    /* Cancel the desktop overlap into the gallery: mobile stages use a
+       4/3 aspect ratio (much taller than the desktop 16/7), so the
+       -220px overhang would swallow the gallery's heading area. */
+    margin-bottom: 0;
+  }
+  .landing-root .hero-3d::before {
+    /* Drop the partial-height background gradient — the hero now sits
+       flush above the gallery on mobile, so let the section bg fill the
+       full height of the hero. */
+    height: 100%;
+  }
+  .landing-root .hero-3d-inner {
+    padding: 0 20px;
+  }
+  .landing-root .hero-3d-copy h1 {
+    font-size: clamp(34px, 8vw, 48px);
+  }
+  .landing-root .hero-3d-copy h1 {
+    margin-bottom: 32px;
+  }
+  .landing-root .hero-3d-row {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    text-align: center;
+  }
+  .landing-root .hero-3d-sub {
+    text-align: center;
+  }
+  .landing-root .hero-3d-cta {
+    justify-self: center;
+  }
+  .landing-root .hero-3d-stage {
+    aspect-ratio: 4 / 3;
+  }
+  .landing-root .hero-3d-nav {
+    width: 40px;
+    height: 40px;
+  }
+  .landing-root .hero-3d-nav-prev { left: 10px; }
+  .landing-root .hero-3d-nav-next { right: 10px; }
+  .landing-root .hero-3d-label {
+    bottom: 14px;
+    padding: 6px 12px;
+  }
+}
+
+/* ==========================================================
+   §1b LEGACY HERO (Variant A — split copy + before/after slider)
+   Retained for the v2 backup component and the /original-lp archive.
    ========================================================== */
 
 .landing-root .hero {
@@ -1191,6 +1707,20 @@
   background: #f4eada;
   position: relative;
   overflow: hidden;
+}
+.landing-root .gallery::before {
+  /* Soft 50px fade from the hero section background (#fbf9f5) into the
+     gallery's own beige so the seam between the two sections doesn't
+     read as a hard line. */
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 50px;
+  background: linear-gradient(to bottom, #fbf9f5, #f4eada);
+  pointer-events: none;
+  z-index: 0;
 }
 .landing-root .leaf-fall {
   position: absolute;
