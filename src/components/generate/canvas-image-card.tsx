@@ -43,6 +43,8 @@ interface CanvasImageCardProps {
   onLibraryTagClick?: (tagId: string) => void;
   /** Triggered when user clicks "Finalize Video" on a video card. */
   onRequestFinalize?: (videoGenerationId: string) => void;
+  /** Triggered when user clicks "Finalize in HD" on an image generation card. */
+  onRequestFinalizeImage?: (generationId: string) => void;
   /** Set by InfiniteCanvas while a two-finger pinch is in progress so the
    *  card can skip its own drag/resize math (pinch wins over card drag). */
   pinchActiveRef: React.RefObject<boolean>;
@@ -63,6 +65,7 @@ export const CanvasImageCard = memo(function CanvasImageCard({
   onRequestDelete,
   onLibraryTagClick,
   onRequestFinalize,
+  onRequestFinalizeImage,
   pinchActiveRef,
 }: CanvasImageCardProps) {
   const [hovered, setHovered] = useState(false);
@@ -491,6 +494,22 @@ export const CanvasImageCard = memo(function CanvasImageCard({
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                 </svg>
                 Finalize Video
+              </button>
+            )}
+            {item.type === "generation" && onRequestFinalizeImage && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMenuOpen(false);
+                  onRequestFinalizeImage(item.id);
+                }}
+                className="flex w-full items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors hover:bg-gray-100"
+                style={{ color: "var(--color-foreground)" }}
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m7-18l2.4 7.2L24 11l-6.6 0.8L15 19l-2.4-7.2L6 11l6.6-0.8L15 3z" />
+                </svg>
+                Finalize in HD
               </button>
             )}
             <button

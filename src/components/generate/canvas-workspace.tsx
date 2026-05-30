@@ -1445,6 +1445,112 @@ export function CanvasWorkspace({
     }
   }
 
+  // Finalize a chosen variation: re-render it at full resolution for 1 credit.
+  async function handleFinalizeImage(generationId: string) {
+    const sourceItem = canvasItems.find((i) => i.id === generationId);
+    if (!sourceItem) return;
+
+    const srcPos = positions[generationId];
+    const width = srcPos?.width ?? DEFAULT_WIDTH;
+    const height = srcPos?.height ?? DEFAULT_WIDTH * 0.75;
+    const x = srcPos?.x ?? 0;
+    // Drop the HD render just below the chosen variation (clear of its metadata).
+    const y = (srcPos?.y ?? 0) + height + 200;
+
+    const placeholderId = crypto.randomUUID();
+    const placeholder: CanvasItem = {
+      id: placeholderId,
+      type: "generation",
+      imageId: sourceItem.imageId,
+      url: sourceItem.url,
+      sourceUrl: sourceItem.url,
+      naturalWidth: sourceItem.naturalWidth,
+      naturalHeight: sourceItem.naturalHeight,
+      status: "generating",
+      title: "FINALIZING HD…",
+    };
+    setCanvasItems((prev) => [...prev, placeholder]);
+    addItemPosition(placeholderId, { x, y, width, height });
+    handleSelectItem(placeholderId);
+
+    try {
+      const res = await fetch("/api/generate/finalize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ generationId }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setCanvasItems((prev) => prev.filter((i) => i.id !== placeholderId));
+        if (data.code === "NO_CREDITS") {
+          openPurchaseCredits({
+            title: "You're out of credits",
+            subtitle: "Buy credits to finalize your design in HD.",
+          });
+        } else {
+          setError(data.error || "Finalize failed. Please try again.");
+        }
+        return;
+      }
+
+      const gen = data.generation;
+      setCanvasItems((prev) =>
+        prev.map((item) =>
+          item.id === placeholderId
+            ? {
+                ...item,
+                id: gen.id,
+                url: gen.url,
+                status: "revealing" as const,
+                title: "HD · FINALIZED",
+                generation: {
+                  id: gen.id,
+                  image_id: gen.image_id,
+                  user_id: userId,
+                  parent_generation_id: gen.parent_generation_id ?? generationId,
+                  storage_path: "",
+                  prompt: gen.prompt,
+                  custom_prompt: gen.custom_prompt ?? null,
+                  selected_library_items: gen.selected_library_items ?? null,
+                  style_preset: gen.style_preset ?? null,
+                  time_of_day: gen.time_of_day ?? null,
+                  season: gen.season ?? null,
+                  weather: gen.weather ?? null,
+                  is_inpaint: false,
+                  input_tokens: null,
+                  output_tokens: null,
+                  generation_cost_cents: null,
+                  status: "completed" as const,
+                  error_message: null,
+                  created_at: new Date().toISOString(),
+                  image_model: gen.image_model ?? null,
+                  url: gen.url,
+                },
+                userPrompt: sourceItem.userPrompt,
+                settingsSummary: sourceItem.settingsSummary,
+                libraryTags: sourceItem.libraryTags,
+              }
+            : item
+        )
+      );
+      replaceItemId(placeholderId, gen.id);
+      setCredits(data.credits_remaining);
+      handleSelectItem(gen.id);
+
+      setTimeout(() => {
+        setCanvasItems((prev) =>
+          prev.map((item) =>
+            item.id === gen.id ? { ...item, status: "ready" as const } : item
+          )
+        );
+      }, 2200);
+    } catch {
+      setCanvasItems((prev) => prev.filter((i) => i.id !== placeholderId));
+      setError("Network error. Please try again.");
+    }
+  }
+
   // --- Upload ---
   async function handleUploadFile(file: File) {
     const validationError = validateImageFile(file);
@@ -1674,6 +1780,7 @@ export function CanvasWorkspace({
                 onRequestFinalize={(videoGenerationId) =>
                   setFinalizeVideoId(videoGenerationId)
                 }
+                onRequestFinalizeImage={handleFinalizeImage}
                 pinchActiveRef={pinchActiveRef}
               />
             );
