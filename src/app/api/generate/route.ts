@@ -3,11 +3,13 @@ import sharp from "sharp";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { deductCredit, refundCredit } from "@/lib/utils/credits";
-import { buildPrompt } from "@/lib/gemini/prompts";
+import { buildPrompt, VARIATION_DIRECTIVES } from "@/lib/gemini/prompts";
 import { getGenerationPath, BUCKET_GENERATIONS, BUCKET_UPLOADS, fetchLibraryImageParts } from "@/lib/utils/storage";
 import { getImageModel } from "@/lib/image-models";
+import { VARIATIONS_PER_GENERATION, VARIATION_MAX_DIMENSION } from "@/lib/image-models/config";
 
-// Allow up to 3 retry attempts of a ~10-20s AI call inside one request.
+// Up to 3 retry attempts of a ~10-20s AI call, now fanned out across N variants
+// in parallel — wall-clock stays close to a single call.
 export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
@@ -118,17 +120,30 @@ export async function POST(request: NextRequest) {
         ? "image/webp"
         : "image/jpeg";
 
-    // Get source image dimensions for aspect ratio preservation
+    // Source dimensions, used both for aspect-ratio preservation and to derive
+    // a capped target size for the variation batch.
     const sourceMeta = await sharp(sourceBuffer).metadata();
     const sourceWidth = sourceMeta.width ?? 1024;
     const sourceHeight = sourceMeta.height ?? 1024;
 
-    // 5. Create generation record (pending)
-    const generationId = crypto.randomUUID();
-    const storagePath = getGenerationPath(user.id, projectId, generationId);
-    const prompt = buildPrompt({ style: style ?? null, timeOfDay, season, weather, customPrompt, selectedPlants, selectedHardscape, sourceWidth, sourceHeight, hasReferenceAttachments: (referenceImages?.length ?? 0) > 0 });
+    // Cap the batch resolution: N images per request is N x the API cost, so we
+    // render the explore batch at a modest size and downscale the model input to
+    // match. Aspect ratio is preserved (uniform scale).
+    const longestEdge = Math.max(sourceWidth, sourceHeight);
+    const scale = longestEdge > VARIATION_MAX_DIMENSION ? VARIATION_MAX_DIMENSION / longestEdge : 1;
+    const targetWidth = Math.max(1, Math.round(sourceWidth * scale));
+    const targetHeight = Math.max(1, Math.round(sourceHeight * scale));
 
-    // Build library items metadata for persistence
+    const modelInputBase64 =
+      scale < 1
+        ? (
+            await sharp(sourceBuffer)
+              .resize(targetWidth, targetHeight, { fit: "inside" })
+              .toBuffer()
+          ).toString("base64")
+        : base64Image;
+
+    // Library items metadata for persistence (shared across all variants).
     const allItems = [...(selectedPlants ?? []), ...(selectedHardscape ?? [])];
     const libraryItemsMeta = allItems.length > 0
       ? allItems.map((item) => ({
@@ -141,25 +156,62 @@ export async function POST(request: NextRequest) {
       : null;
 
     const imageModel = getImageModel(model);
-    console.log(`[generate] model=${imageModel.name} generationId=${generationId}`);
 
-    const { error: insertError } = await admin.from("generations").insert({
-      id: generationId,
-      image_id: imageId,
-      user_id: user.id,
-      parent_generation_id: parentGenerationId || null,
-      storage_path: storagePath,
-      prompt,
-      custom_prompt: customPrompt || null,
-      selected_library_items: libraryItemsMeta,
-      style_preset: style || null,
-      time_of_day: timeOfDay || null,
-      season: season || null,
-      weather: weather || null,
-      is_inpaint: false,
-      status: "pending",
-      image_model: imageModel.name,
+    // 5. Build N pending generation records grouped by a batch id. Each variant
+    //    gets a distinct "design direction" + seed so the batch is diverse.
+    const batchId = crypto.randomUUID();
+    const variantCount = Math.max(1, VARIATIONS_PER_GENERATION);
+    const variants = Array.from({ length: variantCount }, (_, index) => {
+      const id = crypto.randomUUID();
+      const variationDirective =
+        variantCount > 1 ? VARIATION_DIRECTIVES[index % VARIATION_DIRECTIVES.length] : undefined;
+      const prompt = buildPrompt({
+        style: style ?? null,
+        timeOfDay,
+        season,
+        weather,
+        customPrompt,
+        selectedPlants,
+        selectedHardscape,
+        sourceWidth: targetWidth,
+        sourceHeight: targetHeight,
+        hasReferenceAttachments: (referenceImages?.length ?? 0) > 0,
+        variationDirective,
+      });
+      return {
+        index,
+        id,
+        prompt,
+        storagePath: getGenerationPath(user.id, projectId, id),
+        seed: Math.floor(Math.random() * 2_147_483_647),
+      };
     });
+
+    console.log(
+      `[generate] model=${imageModel.name} batch=${batchId} variants=${variantCount} size=${targetWidth}x${targetHeight}`,
+    );
+
+    const { error: insertError } = await admin.from("generations").insert(
+      variants.map((v) => ({
+        id: v.id,
+        image_id: imageId,
+        user_id: user.id,
+        parent_generation_id: parentGenerationId || null,
+        batch_id: batchId,
+        variant_index: v.index,
+        storage_path: v.storagePath,
+        prompt: v.prompt,
+        custom_prompt: customPrompt || null,
+        selected_library_items: libraryItemsMeta,
+        style_preset: style || null,
+        time_of_day: timeOfDay || null,
+        season: season || null,
+        weather: weather || null,
+        is_inpaint: false,
+        status: "pending",
+        image_model: imageModel.name,
+      })),
+    );
 
     if (insertError) {
       return NextResponse.json(
@@ -168,13 +220,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 6. Deduct credit
-    const deducted = await deductCredit(user.id, generationId);
+    // 6. Deduct ONE credit for the whole batch (tracked against the first variant).
+    const creditRef = variants[0].id;
+    const deducted = await deductCredit(user.id, creditRef);
     if (!deducted) {
       await admin
         .from("generations")
         .update({ status: "failed", error_message: "Insufficient credits" })
-        .eq("id", generationId);
+        .eq("batch_id", batchId);
 
       return NextResponse.json(
         { error: "Insufficient credits", code: "NO_CREDITS" },
@@ -182,106 +235,111 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 7. Update status to processing + fetch reference images in parallel
+    // 7. Move batch to processing + fetch shared reference images in parallel.
     const allSelectedItems = [
       ...(selectedPlants ?? []),
       ...(selectedHardscape ?? []),
     ];
     const [, refImages] = await Promise.all([
-      admin.from("generations").update({ status: "processing" }).eq("id", generationId),
+      admin.from("generations").update({ status: "processing" }).eq("batch_id", batchId),
       fetchLibraryImageParts(admin, allSelectedItems),
     ]);
 
-    // 9. Call image model
-    let generatedImageBase64: string;
+    const allRefs = [
+      ...refImages.map((r) => ({ base64: r.data, mimeType: r.mimeType })),
+      ...(referenceImages ?? []),
+    ];
 
-    try {
-      const allRefs = [
-        ...refImages.map((r) => ({ base64: r.data, mimeType: r.mimeType })),
-        ...(referenceImages ?? []),
-      ];
+    // 8. Generate every variant in parallel. A failed variant marks only its own
+    //    row failed and resolves to null; its siblings are unaffected.
+    let failureSample: unknown = null;
+    const settled = await Promise.all(
+      variants.map(async (v) => {
+        try {
+          const result = await imageModel.generate({
+            sourceImage: { base64: modelInputBase64, mimeType },
+            referenceImages: allRefs,
+            prompt: v.prompt,
+            width: targetWidth,
+            height: targetHeight,
+            seed: v.seed,
+            onRetry: (err, attempt, nextDelayMs) => {
+              const msg = err instanceof Error ? err.message : String(err);
+              console.warn(
+                `[generate/${imageModel.name}] batch=${batchId} variant=${v.index} transient error on attempt ${attempt}, retrying in ${Math.round(nextDelayMs)}ms:`,
+                msg,
+              );
+            },
+          });
 
-      const result = await imageModel.generate({
-        sourceImage: { base64: base64Image, mimeType },
-        referenceImages: allRefs,
-        prompt,
-        width: sourceWidth,
-        height: sourceHeight,
-        onRetry: (err, attempt, nextDelayMs) => {
-          const msg = err instanceof Error ? err.message : String(err);
-          console.warn(
-            `[generate/${imageModel.name}] transient error on attempt ${attempt}, retrying in ${Math.round(nextDelayMs)}ms:`,
-            msg,
-          );
-        },
-      });
+          const imageBuffer = Buffer.from(result.base64, "base64");
+          const { error: uploadError } = await admin.storage
+            .from(BUCKET_GENERATIONS)
+            .upload(v.storagePath, imageBuffer, {
+              contentType: "image/webp",
+              cacheControl: "3600",
+            });
+          if (uploadError) throw new Error("Failed to save result");
 
-      generatedImageBase64 = result.base64;
-    } catch (err: unknown) {
-      // Refund credit on AI failure
-      await refundCredit(user.id, generationId);
+          await admin.from("generations").update({ status: "completed" }).eq("id", v.id);
 
-      const rawMessage =
-        err instanceof Error ? err.message : "AI generation failed";
-      const userMessage = imageModel.friendlyError(err);
-      await admin
-        .from("generations")
-        .update({ status: "failed", error_message: rawMessage })
-        .eq("id", generationId);
+          const { data: urlData } = await admin.storage
+            .from(BUCKET_GENERATIONS)
+            .createSignedUrl(v.storagePath, 3600);
 
-      return NextResponse.json({ error: userMessage }, { status: 502 });
-    }
+          return {
+            id: v.id,
+            image_id: imageId,
+            status: "completed" as const,
+            prompt: v.prompt,
+            custom_prompt: customPrompt || null,
+            selected_library_items: libraryItemsMeta,
+            style_preset: style || null,
+            time_of_day: timeOfDay || null,
+            season: season || null,
+            weather: weather || null,
+            image_model: imageModel.name,
+            batch_id: batchId,
+            variant_index: v.index,
+            url: urlData?.signedUrl ?? "",
+          };
+        } catch (err: unknown) {
+          failureSample = err;
+          const rawMessage = err instanceof Error ? err.message : "AI generation failed";
+          await admin
+            .from("generations")
+            .update({ status: "failed", error_message: rawMessage })
+            .eq("id", v.id);
+          return null;
+        }
+      }),
+    );
 
-    // 9. Upload generated image to storage
-    const imageBuffer = Buffer.from(generatedImageBase64, "base64");
+    const succeeded = settled
+      .filter((g): g is NonNullable<typeof g> => g !== null)
+      .sort((a, b) => a.variant_index - b.variant_index);
 
-    const { error: uploadError } = await admin.storage
-      .from(BUCKET_GENERATIONS)
-      .upload(storagePath, imageBuffer, {
-        contentType: "image/webp",
-        cacheControl: "3600",
-      });
-
-    if (uploadError) {
-      await refundCredit(user.id, generationId);
-      await admin
-        .from("generations")
-        .update({ status: "failed", error_message: "Failed to save result" })
-        .eq("id", generationId);
-
+    // 9. If every variant failed, refund the one credit and surface the error.
+    if (succeeded.length === 0) {
+      await refundCredit(user.id, creditRef);
       return NextResponse.json(
-        { error: "Failed to save generated image" },
-        { status: 500 }
+        { error: imageModel.friendlyError(failureSample) },
+        { status: 502 }
       );
     }
 
-    // 10. Mark completed
-    await admin
-      .from("generations")
-      .update({ status: "completed" })
-      .eq("id", generationId);
-
-    // 11. Get signed URL + updated credit balance (parallel)
-    const [{ data: urlData }, { data: profile }] = await Promise.all([
-      admin.storage.from(BUCKET_GENERATIONS).createSignedUrl(storagePath, 3600),
-      admin.from("profiles").select("credits_balance").eq("id", user.id).single(),
-    ]);
+    // 10. Return all successful variants + updated balance.
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("credits_balance")
+      .eq("id", user.id)
+      .single();
 
     return NextResponse.json({
-      generation: {
-        id: generationId,
-        image_id: imageId,
-        status: "completed",
-        prompt,
-        custom_prompt: customPrompt || null,
-        selected_library_items: libraryItemsMeta,
-        style_preset: style || null,
-        time_of_day: timeOfDay || null,
-        season: season || null,
-        weather: weather || null,
-        image_model: imageModel.name,
-        url: urlData?.signedUrl ?? "",
-      },
+      batch_id: batchId,
+      generations: succeeded,
+      // Backward-compat for the legacy (_generate_old) workspace, which reads `generation`.
+      generation: succeeded[0],
       credits_remaining: profile?.credits_balance ?? 0,
     });
   } catch (err) {

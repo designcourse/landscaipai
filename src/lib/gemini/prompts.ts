@@ -190,6 +190,8 @@ export interface GenerationParams {
   sourceWidth?: number;
   sourceHeight?: number;
   hasReferenceAttachments?: boolean;
+  /** Per-variant design nudge (multi-variation batches) — steers composition without overriding the user's prompt. */
+  variationDirective?: string;
 }
 
 export interface InpaintParams {
@@ -206,6 +208,18 @@ export interface InpaintParams {
 
 const SYSTEM_CONTEXT =
   "You are a professional landscape designer. Preserve the existing architecture, structures, and non-landscape elements exactly as they appear.";
+
+/**
+ * Per-variant "design direction" nudges so one request yields meaningfully
+ * different — but on-style — executions. Indexed by variant number. Additive
+ * and orthogonal to the user's own prompt: they steer composition (density,
+ * structure, focal point), never override an explicit request.
+ */
+export const VARIATION_DIRECTIVES: string[] = [
+  "Design direction for this version: lean into a fuller, more abundant planting layout — denser beds, richer layering, and more greenery — while staying true to the chosen style.",
+  "Design direction for this version: lean into a cleaner, more restrained and structured layout — crisp lines, defined bed edges, and open breathing room — while staying true to the chosen style.",
+  "Design direction for this version: build the composition around one standout focal point — a specimen tree, water feature, or sculptural planting — appropriate to the chosen style.",
+];
 
 export function buildPrompt(params: GenerationParams): string {
   const parts = [SYSTEM_CONTEXT];
@@ -247,6 +261,8 @@ export function buildPrompt(params: GenerationParams): string {
       "Additional reference images have been attached by the user. Use them as visual context — they may show specific features, materials, styles, or elements the user wants incorporated or matched in the design. Follow the user's custom instructions regarding how to use these references."
     );
   }
+
+  if (params.variationDirective) parts.push(params.variationDirective);
 
   if (params.customPrompt) parts.push(params.customPrompt);
 

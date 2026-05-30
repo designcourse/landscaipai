@@ -12,6 +12,7 @@ import {
   SEASON_OPTIONS,
   WEATHER_OPTIONS,
 } from "@/lib/gemini/prompts";
+import { VARIATIONS_PER_GENERATION } from "@/lib/image-models/config";
 import { InfiniteCanvas } from "./infinite-canvas";
 import { CanvasImageCard, type CanvasItem } from "./canvas-image-card";
 import { MobileVideoFramePicker } from "./mobile-video-frame-picker";
@@ -1165,18 +1166,22 @@ export function CanvasWorkspace({
     const parentGenerationId =
       selectedItem.type === "generation" ? selectedItem.id : null;
 
-    // Create placeholder to the right of the selected item, avoiding overlaps
+    // Inpaint stays single; a fresh/iterated generation fans out into N variations.
+    const variantCount = maskBase64 ? 1 : VARIATIONS_PER_GENERATION;
+
+    // Base position: to the right of the selected item, avoiding overlaps.
     const selectedPos = positions[selectedItem.id];
-    const placeholderId = crypto.randomUUID();
     const placeholderWidth = selectedPos?.width ?? DEFAULT_WIDTH;
     const placeholderHeight = selectedPos?.height ?? DEFAULT_WIDTH * 0.75;
     const placeholderY = selectedPos?.y ?? 0;
     // Extra height for metadata (title + tags + prompt) below the image
     const metadataHeight = 160;
+    const columnStep = placeholderWidth + GENERATION_OFFSET_X;
+    const rowWidth = columnStep * variantCount;
 
-    let placeholderX = (selectedPos?.x ?? 0) + (selectedPos?.width ?? DEFAULT_WIDTH) + GENERATION_OFFSET_X;
+    let baseX = (selectedPos?.x ?? 0) + (selectedPos?.width ?? DEFAULT_WIDTH) + GENERATION_OFFSET_X;
 
-    // Check for overlaps and shift right until free
+    // Shift the whole row right until it clears existing items.
     const maxAttempts = 50;
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       let hasOverlap = false;
@@ -1186,13 +1191,13 @@ export function CanvasWorkspace({
         const newBottom = placeholderY + placeholderHeight + metadataHeight;
         // Check if rectangles overlap
         if (
-          placeholderX < pos.x + pos.width &&
-          placeholderX + placeholderWidth > pos.x &&
+          baseX < pos.x + pos.width &&
+          baseX + rowWidth > pos.x &&
           placeholderY < posBottom &&
           newBottom > pos.y
         ) {
           // Shift to the right edge of the overlapping item + gap
-          placeholderX = pos.x + pos.width + GENERATION_OFFSET_X;
+          baseX = pos.x + pos.width + GENERATION_OFFSET_X;
           hasOverlap = true;
           break;
         }
@@ -1200,35 +1205,45 @@ export function CanvasWorkspace({
       if (!hasOverlap) break;
     }
 
-    const placeholder: CanvasItem = {
-      id: placeholderId,
-      type: "generation",
-      imageId: sourceImageId,
-      url: selectedItem.url,
-      sourceUrl: selectedItem.url,
-      naturalWidth: selectedItem.naturalWidth,
-      naturalHeight: selectedItem.naturalHeight,
-      status: "generating",
-      title: style
-        ? STYLE_PRESETS.find((s) => s.id === style)?.name?.toUpperCase() ?? "GENERATING..."
-        : "GENERATING...",
-    };
+    // One placeholder per variation, laid out in a horizontal row.
+    const placeholderIds: string[] = [];
+    const placeholders: CanvasItem[] = [];
+    for (let i = 0; i < variantCount; i++) {
+      const id = crypto.randomUUID();
+      placeholderIds.push(id);
+      placeholders.push({
+        id,
+        type: "generation",
+        imageId: sourceImageId,
+        url: selectedItem.url,
+        sourceUrl: selectedItem.url,
+        naturalWidth: selectedItem.naturalWidth,
+        naturalHeight: selectedItem.naturalHeight,
+        status: "generating",
+        title: style
+          ? STYLE_PRESETS.find((s) => s.id === style)?.name?.toUpperCase() ?? "GENERATING..."
+          : "GENERATING...",
+      });
+    }
 
-    setCanvasItems((prev) => [...prev, placeholder]);
-    addItemPosition(placeholderId, {
-      x: placeholderX,
-      y: placeholderY,
-      width: placeholderWidth,
-      height: placeholderHeight,
+    setCanvasItems((prev) => [...prev, ...placeholders]);
+    placeholderIds.forEach((id, i) => {
+      addItemPosition(id, {
+        x: baseX + i * columnStep,
+        y: placeholderY,
+        width: placeholderWidth,
+        height: placeholderHeight,
+      });
     });
 
-    // Center the viewport on the new generation
+    // Center the viewport on the row of new generations.
     const container = canvasContainerRef.current;
     if (container) {
       const rect = container.getBoundingClientRect();
+      const rowCenterX = baseX + (rowWidth - GENERATION_OFFSET_X) / 2;
       setViewport({
         ...viewport,
-        panX: -placeholderX + (rect.width / 2) / viewport.zoom - placeholderWidth / 2,
+        panX: -rowCenterX + (rect.width / 2) / viewport.zoom,
         panY: -placeholderY + (rect.height / 2) / viewport.zoom - placeholderHeight / 2,
       });
     }
@@ -1294,8 +1309,8 @@ export function CanvasWorkspace({
       const data = await res.json();
 
       if (!res.ok) {
-        // Remove placeholder on failure
-        setCanvasItems((prev) => prev.filter((i) => i.id !== placeholderId));
+        // Remove placeholders on failure
+        setCanvasItems((prev) => prev.filter((i) => !placeholderIds.includes(i.id)));
         if (data.code === "NO_CREDITS") {
           openPurchaseCredits({
             title: "You're out of credits",
@@ -1307,8 +1322,25 @@ export function CanvasWorkspace({
         return;
       }
 
-      // Build the real generation item from API response
-      const genData = data.generation;
+      // API returns an array of variations (generate) or a single item (inpaint/legacy).
+      type GenData = {
+        id: string;
+        image_id: string;
+        prompt: string;
+        selected_library_items: { id: string; name: string; thumbnail_url: string }[] | null;
+        style_preset: string | null;
+        time_of_day: string | null;
+        season: string | null;
+        weather: string | null;
+        image_model: string | null;
+        url: string;
+      };
+      const genList: GenData[] = Array.isArray(data.generations)
+        ? data.generations
+        : data.generation
+          ? [data.generation]
+          : [];
+
       const libraryTags = selectedLibraryItems.map((li) => ({
         name: li.common_name,
         id: li.id,
@@ -1317,80 +1349,96 @@ export function CanvasWorkspace({
           : "",
       }));
 
-      // Build settings summary separately from user prompt
-      const settingsParts: string[] = [];
-      if (genData.style_preset) {
-        const preset = STYLE_PRESETS.find((s: { id: string }) => s.id === genData.style_preset);
-        if (preset) settingsParts.push(preset.name + " style");
-      }
-      if (genData.time_of_day) settingsParts.push(genData.time_of_day);
-      if (genData.season) settingsParts.push(genData.season);
-      if (genData.weather) settingsParts.push(genData.weather);
-      const settingsSummary = settingsParts.join(" · ");
+      const buildSettingsSummary = (g: GenData): string => {
+        const settingsParts: string[] = [];
+        if (g.style_preset) {
+          const preset = STYLE_PRESETS.find((s) => s.id === g.style_preset);
+          if (preset) settingsParts.push(preset.name + " style");
+        }
+        if (g.time_of_day) settingsParts.push(g.time_of_day);
+        if (g.season) settingsParts.push(g.season);
+        if (g.weather) settingsParts.push(g.weather);
+        return settingsParts.join(" · ");
+      };
 
-      // Replace placeholder with real generation — use the DB ID so positions persist across refresh
-      const realId = genData.id as string;
+      // placeholderIds[i] maps to genList[i]; the server returns ≤ variantCount results.
+      const realIds = genList.slice(0, placeholderIds.length).map((g) => g.id);
 
-      setCanvasItems((prev) =>
-        prev.map((item) =>
-          item.id === placeholderId
-            ? {
-                ...item,
-                id: realId,
-                url: genData.url,
-                status: "revealing" as const,
-                title: genData.style_preset
-                  ? STYLE_PRESETS.find((s) => s.id === genData.style_preset)?.name?.toUpperCase() ?? "AI GENERATED"
-                  : "AI GENERATED",
-                generation: {
-                  id: realId,
-                  image_id: genData.image_id,
-                  user_id: userId,
-                  parent_generation_id: parentGenerationId,
-                  storage_path: "",
-                  prompt: genData.prompt,
-                  custom_prompt: capturedUserPrompt || null,
-                  selected_library_items: genData.selected_library_items ?? null,
-                  style_preset: genData.style_preset,
-                  time_of_day: genData.time_of_day,
-                  season: genData.season,
-                  weather: genData.weather,
-                  is_inpaint: !!maskBase64,
-                  input_tokens: null,
-                  output_tokens: null,
-                  generation_cost_cents: null,
-                  status: "completed" as const,
-                  error_message: null,
-                  created_at: new Date().toISOString(),
-                  image_model: genData.image_model ?? null,
+      // Replace each placeholder with its result; drop placeholders with no
+      // result (a variant that failed, or fewer returned than requested).
+      setCanvasItems((prev) => {
+        let next = prev;
+        placeholderIds.forEach((pid, i) => {
+          const genData = genList[i];
+          if (!genData) {
+            next = next.filter((item) => item.id !== pid);
+            return;
+          }
+          const settingsSummary = buildSettingsSummary(genData);
+          next = next.map((item) =>
+            item.id === pid
+              ? {
+                  ...item,
+                  id: genData.id,
                   url: genData.url,
-                },
-                libraryTags: libraryTags.length > 0 ? libraryTags : undefined,
-                userPrompt: capturedUserPrompt || undefined,
-                settingsSummary: settingsSummary || undefined,
-              }
-            : item
-        )
-      );
+                  status: "revealing" as const,
+                  title: genData.style_preset
+                    ? STYLE_PRESETS.find((s) => s.id === genData.style_preset)?.name?.toUpperCase() ?? "AI GENERATED"
+                    : "AI GENERATED",
+                  generation: {
+                    id: genData.id,
+                    image_id: genData.image_id,
+                    user_id: userId,
+                    parent_generation_id: parentGenerationId,
+                    storage_path: "",
+                    prompt: genData.prompt,
+                    custom_prompt: capturedUserPrompt || null,
+                    selected_library_items: genData.selected_library_items ?? null,
+                    style_preset: genData.style_preset,
+                    time_of_day: genData.time_of_day,
+                    season: genData.season,
+                    weather: genData.weather,
+                    is_inpaint: !!maskBase64,
+                    input_tokens: null,
+                    output_tokens: null,
+                    generation_cost_cents: null,
+                    status: "completed" as const,
+                    error_message: null,
+                    created_at: new Date().toISOString(),
+                    image_model: genData.image_model ?? null,
+                    url: genData.url,
+                  },
+                  libraryTags: libraryTags.length > 0 ? libraryTags : undefined,
+                  userPrompt: capturedUserPrompt || undefined,
+                  settingsSummary: settingsSummary || undefined,
+                }
+              : item
+          );
+        });
+        return next;
+      });
 
-      // Swap position key from placeholder UUID → real DB ID so it persists across refresh
-      replaceItemId(placeholderId, realId);
+      // Swap position keys placeholder UUID → real DB id so they persist across refresh.
+      placeholderIds.forEach((pid, i) => {
+        const genData = genList[i];
+        if (genData) replaceItemId(pid, genData.id);
+      });
 
       setCredits(data.credits_remaining);
       setMaskBase64(null);
       setRawMaskBase64(null);
-      handleSelectItem(realId);
+      if (realIds.length > 0) handleSelectItem(realIds[0]);
 
-      // After 2s reveal animation, set status to ready
+      // After the reveal animation, mark all new cards ready.
       setTimeout(() => {
         setCanvasItems((prev) =>
           prev.map((item) =>
-            item.id === realId ? { ...item, status: "ready" as const } : item
+            realIds.includes(item.id) ? { ...item, status: "ready" as const } : item
           )
         );
       }, 2200);
     } catch {
-      setCanvasItems((prev) => prev.filter((i) => i.id !== placeholderId));
+      setCanvasItems((prev) => prev.filter((i) => !placeholderIds.includes(i.id)));
       setError("Network error. Please try again.");
     } finally {
       setGenerating(false);

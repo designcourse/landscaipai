@@ -510,7 +510,7 @@ export function CanvasBottomBar({
                 <>
                   Generate
                   <span className="font-medium" style={{ color: "#95f788" }}>
-                    {" "}(1 credit)
+                    {" "}(1 credit · 3 designs)
                   </span>
                 </>
               )}

@@ -9,6 +9,8 @@ export interface GenerateInput {
   prompt: string;
   width: number;
   height: number;
+  /** Optional sampling seed — diversifies output across sibling variations (Gemini honors it; OpenAI ignores). */
+  seed?: number;
   onRetry?: (err: unknown, attempt: number, nextDelayMs: number) => void;
 }
 

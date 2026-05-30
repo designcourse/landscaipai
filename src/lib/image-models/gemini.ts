@@ -65,6 +65,7 @@ function createGeminiProvider(options: {
     width: number,
     height: number,
     onRetry?: GenerateInput["onRetry"],
+    seed?: number,
   ): Promise<string> {
     const response = await withGeminiRetry(
       () =>
@@ -74,6 +75,7 @@ function createGeminiProvider(options: {
           config: {
             responseModalities: ["TEXT", "IMAGE"],
             imageConfig: { imageSize: getImageSize(width, height) },
+            ...(seed !== undefined ? { seed } : {}),
           },
         }),
       { onRetry },
@@ -103,7 +105,7 @@ function createGeminiProvider(options: {
       }
       parts.push({ text: input.prompt });
 
-      const base64 = await callGemini(parts, input.width, input.height, input.onRetry);
+      const base64 = await callGemini(parts, input.width, input.height, input.onRetry, input.seed);
       return { base64 };
     },
 
