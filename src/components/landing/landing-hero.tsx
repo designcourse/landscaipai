@@ -1118,7 +1118,7 @@ export function LandingHero() {
                     fill="currentColor"
                   />
                 </svg>
-                5 Free Credits
+                10 Free Credits
               </span>
             </button>
           </div>

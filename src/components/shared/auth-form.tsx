@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { isDisposableEmailDomain } from "@/lib/utils/email";
 
 type AuthMode = "login" | "signup";
 
@@ -51,6 +52,11 @@ export function AuthForm({
         return;
       }
     } else {
+      if (isDisposableEmailDomain(email)) {
+        setError("Please use a permanent email address — disposable/temporary email providers aren't supported.");
+        setLoading(false);
+        return;
+      }
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
