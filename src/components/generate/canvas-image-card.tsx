@@ -182,6 +182,15 @@ export const CanvasImageCard = memo(function CanvasImageCard({
   // Images: show Edit Region. Videos: show only a download button.
   const showEditRegion = hovered && !isGenerating && !isRevealing && !isVideo && zoom >= 0.4;
   const showVideoDownload = hovered && !isGenerating && isVideo && zoom >= 0.4;
+  // Always-on "Finalize in HD" badge on image generations (not hover-gated, so
+  // it's discoverable and works on touch). Hidden while generating/revealing and
+  // when zoomed far out to avoid clutter.
+  const showHdBadge =
+    item.type === "generation" &&
+    !isGenerating &&
+    !isRevealing &&
+    !!onRequestFinalizeImage &&
+    zoom >= 0.4;
 
   // Trigger a download of the current item (image or video)
   const triggerDownload = useCallback(() => {
@@ -407,8 +416,8 @@ export const CanvasImageCard = memo(function CanvasImageCard({
           </div>
         )}
 
-        {/* Hover action buttons (Edit Region + 3-dot menu) */}
-        {showEditRegion && (
+        {/* Hover actions (Edit Region + 3-dot) plus the always-on "Finalize in HD" badge */}
+        {(showEditRegion || showHdBadge) && (
           <div
             className="absolute right-4 top-4 flex items-center gap-2"
             style={{
@@ -416,32 +425,53 @@ export const CanvasImageCard = memo(function CanvasImageCard({
               transformOrigin: "top right",
             }}
           >
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onEditRegion(item.id);
-              }}
-              className="flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-semibold shadow-lg transition-shadow hover:shadow-xl"
-              style={{ color: "#1a1a1a" }}
-            >
-              <svg className="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-              </svg>
-              Edit Region
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setMenuOpen((prev) => !prev);
-              }}
-              className="flex h-[38px] w-[38px] items-center justify-center rounded-full bg-white shadow-lg transition-shadow hover:shadow-xl"
-            >
-              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="#1a1a1a">
-                <circle cx="12" cy="5" r="2" />
-                <circle cx="12" cy="12" r="2" />
-                <circle cx="12" cy="19" r="2" />
-              </svg>
-            </button>
+            {showEditRegion && (
+              <>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEditRegion(item.id);
+                  }}
+                  className="flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-semibold shadow-lg transition-shadow hover:shadow-xl"
+                  style={{ color: "#1a1a1a" }}
+                >
+                  <svg className="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                  </svg>
+                  Edit Region
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMenuOpen((prev) => !prev);
+                  }}
+                  className="flex h-[38px] w-[38px] items-center justify-center rounded-full bg-white shadow-lg transition-shadow hover:shadow-xl"
+                >
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="#1a1a1a">
+                    <circle cx="12" cy="5" r="2" />
+                    <circle cx="12" cy="12" r="2" />
+                    <circle cx="12" cy="19" r="2" />
+                  </svg>
+                </button>
+              </>
+            )}
+            {showHdBadge && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRequestFinalizeImage?.(item.id);
+                }}
+                className="flex items-center gap-1.5 rounded-full px-4 py-2.5 text-sm font-bold text-white shadow-lg transition-shadow hover:shadow-xl"
+                style={{ backgroundColor: "var(--color-primary)" }}
+                title="Finalize this design in full HD resolution (1 credit)"
+                aria-label="Finalize in HD"
+              >
+                <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2l2.4 7.2L22 11l-7.6 0.8L12 19l-2.4-7.2L2 11l7.6-0.8L12 2z" />
+                </svg>
+                HD
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -494,22 +524,6 @@ export const CanvasImageCard = memo(function CanvasImageCard({
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                 </svg>
                 Finalize Video
-              </button>
-            )}
-            {item.type === "generation" && onRequestFinalizeImage && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setMenuOpen(false);
-                  onRequestFinalizeImage(item.id);
-                }}
-                className="flex w-full items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors hover:bg-gray-100"
-                style={{ color: "var(--color-foreground)" }}
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m7-18l2.4 7.2L24 11l-6.6 0.8L15 19l-2.4-7.2L6 11l6.6-0.8L15 3z" />
-                </svg>
-                Finalize in HD
               </button>
             )}
             <button
