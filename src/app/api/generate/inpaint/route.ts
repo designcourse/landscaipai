@@ -11,6 +11,8 @@ import {
   fetchLibraryImageParts,
 } from "@/lib/utils/storage";
 import { getImageModel } from "@/lib/image-models";
+import { applyFreeTierWatermark } from "@/lib/utils/watermark";
+import { isPayingCustomer } from "@/lib/billing/status";
 
 // Allow up to 3 retry attempts of a ~10-20s AI call inside one request.
 export const maxDuration = 60;
@@ -290,6 +292,13 @@ export async function POST(request: NextRequest) {
         .eq("id", generationId);
 
       return NextResponse.json({ error: userMessage }, { status: 502 });
+    }
+
+    // Free-tier users get the watermark baked in (re-encodes to WebP).
+    const paid = await isPayingCustomer(admin, user.id);
+    if (!paid) {
+      finalImageBuffer = await applyFreeTierWatermark(finalImageBuffer);
+      finalMimeType = "image/webp";
     }
 
     // 10. Upload final image to storage

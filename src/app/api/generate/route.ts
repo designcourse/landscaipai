@@ -7,6 +7,8 @@ import { buildPrompt, VARIATION_DIRECTIVES } from "@/lib/gemini/prompts";
 import { getGenerationPath, BUCKET_GENERATIONS, BUCKET_UPLOADS, fetchLibraryImageParts } from "@/lib/utils/storage";
 import { getImageModel } from "@/lib/image-models";
 import { VARIATIONS_PER_GENERATION, VARIATION_MAX_DIMENSION } from "@/lib/image-models/config";
+import { applyFreeTierWatermark } from "@/lib/utils/watermark";
+import { isPayingCustomer } from "@/lib/billing/status";
 
 // Up to 3 retry attempts of a ~10-20s AI call, now fanned out across N variants
 // in parallel — wall-clock stays close to a single call.
@@ -250,6 +252,10 @@ export async function POST(request: NextRequest) {
       ...(referenceImages ?? []),
     ];
 
+    // Free-tier (non-paying) users get a faint centered leaf watermark baked
+    // into every output; paying customers and admins get clean images.
+    const paid = await isPayingCustomer(admin, user.id);
+
     // 8. Generate every variant in parallel. A failed variant marks only its own
     //    row failed and resolves to null; its siblings are unaffected.
     let failureSample: unknown = null;
@@ -272,7 +278,8 @@ export async function POST(request: NextRequest) {
             },
           });
 
-          const imageBuffer = Buffer.from(result.base64, "base64");
+          const rawBuffer = Buffer.from(result.base64, "base64");
+          const imageBuffer = paid ? rawBuffer : await applyFreeTierWatermark(rawBuffer);
           const { error: uploadError } = await admin.storage
             .from(BUCKET_GENERATIONS)
             .upload(v.storagePath, imageBuffer, {

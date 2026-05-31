@@ -5,6 +5,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { deductCredit, refundCredit } from "@/lib/utils/credits";
 import { getGenerationPath, BUCKET_GENERATIONS } from "@/lib/utils/storage";
 import { getImageModel } from "@/lib/image-models";
+import { applyFreeTierWatermark } from "@/lib/utils/watermark";
+import { isPayingCustomer } from "@/lib/billing/status";
 
 export const maxDuration = 60;
 
@@ -155,11 +157,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: imageModel.friendlyError(err) }, { status: 502 });
     }
 
-    // 7. Upload + mark completed.
+    // 7. Upload + mark completed (free-tier users get the watermark baked in).
     const outBuffer = Buffer.from(resultBase64, "base64");
+    const paid = await isPayingCustomer(admin, user.id);
+    const uploadBuffer = paid ? outBuffer : await applyFreeTierWatermark(outBuffer);
     const { error: uploadError } = await admin.storage
       .from(BUCKET_GENERATIONS)
-      .upload(storagePath, outBuffer, { contentType: "image/webp", cacheControl: "3600" });
+      .upload(storagePath, uploadBuffer, { contentType: "image/webp", cacheControl: "3600" });
     if (uploadError) {
       await refundCredit(user.id, finalId);
       await admin
