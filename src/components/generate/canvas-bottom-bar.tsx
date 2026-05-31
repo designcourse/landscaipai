@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   STYLE_PRESETS,
   TIME_OF_DAY_OPTIONS,
@@ -64,14 +64,6 @@ const IMAGE_MODEL_OPTIONS: { id: "gemini" | "gemini-pro" | "openai"; label: stri
 // Accepted file types for reference attachments
 const ACCEPTED_ATTACHMENT_TYPES = "image/jpeg,image/png,image/webp";
 const MAX_ATTACHMENTS = 5;
-
-// Cycle through options array: current → next → (none) → first → ...
-function cycleOption(current: string, options: readonly string[]): string {
-  if (!current) return options[0];
-  const idx = options.indexOf(current);
-  if (idx === -1 || idx === options.length - 1) return ""; // reset
-  return options[idx + 1];
-}
 
 // Emoji map for settings
 const TIME_EMOJIS: Record<string, string> = {
@@ -296,46 +288,34 @@ export function CanvasBottomBar({
           <div className="h-6 w-px" style={{ backgroundColor: "var(--color-canvas-separator)" }} />
 
           {/* Time of Day */}
-          <button
-            onClick={() => onTimeOfDayChange(cycleOption(timeOfDay, TIME_OF_DAY_OPTIONS))}
-            className="flex h-10 items-center gap-1 whitespace-nowrap rounded-md px-2.5 py-1.5"
-            style={{ backgroundColor: "var(--color-canvas-chip-bg)" }}
-          >
-            <span className="text-xs text-muted-foreground">
-              {TIME_EMOJIS[timeOfDay] || "\u2600\uFE0F"}
-            </span>
-            <span className="text-sm font-medium text-foreground">
-              {timeOfDay || "Time"}
-            </span>
-          </button>
+          <SettingMenu
+            label="Time"
+            value={timeOfDay}
+            options={TIME_OF_DAY_OPTIONS}
+            emojis={TIME_EMOJIS}
+            fallbackEmoji={"\u2600\uFE0F"}
+            onChange={onTimeOfDayChange}
+          />
 
           {/* Season */}
-          <button
-            onClick={() => onSeasonChange(cycleOption(season, SEASON_OPTIONS))}
-            className="flex h-10 items-center gap-1 whitespace-nowrap rounded-md px-2.5 py-1.5"
-            style={{ backgroundColor: "var(--color-canvas-chip-bg)" }}
-          >
-            <span className="text-xs text-muted-foreground">
-              {SEASON_EMOJIS[season] || "\uD83C\uDF3F"}
-            </span>
-            <span className="text-sm font-medium text-foreground">
-              {season || "Season"}
-            </span>
-          </button>
+          <SettingMenu
+            label="Season"
+            value={season}
+            options={SEASON_OPTIONS}
+            emojis={SEASON_EMOJIS}
+            fallbackEmoji={"\uD83C\uDF3F"}
+            onChange={onSeasonChange}
+          />
 
           {/* Weather */}
-          <button
-            onClick={() => onWeatherChange(cycleOption(weather, WEATHER_OPTIONS))}
-            className="flex h-10 items-center gap-1 whitespace-nowrap rounded-md px-2.5 py-1.5"
-            style={{ backgroundColor: "var(--color-canvas-chip-bg)" }}
-          >
-            <span className="text-xs text-muted-foreground">
-              {WEATHER_EMOJIS[weather] || "\u2601\uFE0F"}
-            </span>
-            <span className="text-sm font-medium text-foreground">
-              {weather || "Weather"}
-            </span>
-          </button>
+          <SettingMenu
+            label="Weather"
+            value={weather}
+            options={WEATHER_OPTIONS}
+            emojis={WEATHER_EMOJIS}
+            fallbackEmoji={"\u2601\uFE0F"}
+            onChange={onWeatherChange}
+          />
 
           {/* Separator */}
           <div className="h-6 w-px" style={{ backgroundColor: "var(--color-canvas-separator)" }} />
@@ -518,6 +498,23 @@ export function CanvasBottomBar({
           )}
         </div>
       </div>
+
+      <style jsx global>{`
+        @keyframes setting-menu-rise {
+          from {
+            opacity: 0;
+            transform: translateY(8px) scale(0.98);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+        .setting-menu-pop {
+          transform-origin: bottom left;
+          animation: setting-menu-rise 0.16s ease-out;
+        }
+      `}</style>
     </div>
   );
 }
@@ -596,6 +593,90 @@ function VideoButton({
               borderTop: "5px solid rgba(0, 0, 0, 0.85)",
             }}
           />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ----------------------------------------------------------------------------
+// Setting menu — a chip that opens a pop-up list of options above it, so a
+// value is picked directly instead of cycling through on repeated clicks.
+// ----------------------------------------------------------------------------
+function SettingMenu({
+  label,
+  value,
+  options,
+  emojis,
+  fallbackEmoji,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: readonly string[];
+  emojis: Record<string, string>;
+  fallbackEmoji: string;
+  onChange: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDocMouseDown(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDocMouseDown);
+    return () => document.removeEventListener("mousedown", onDocMouseDown);
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex h-10 items-center gap-1 whitespace-nowrap rounded-md px-2.5 py-1.5"
+        style={{
+          backgroundColor: "var(--color-canvas-chip-bg)",
+          boxShadow: open ? "inset 0 0 0 1px var(--color-primary)" : undefined,
+        }}
+      >
+        <span className="text-xs text-muted-foreground">{emojis[value] || fallbackEmoji}</span>
+        <span className="text-sm font-medium text-foreground">{value || label}</span>
+        <span className="text-[10px] text-muted-foreground">&#9662;</span>
+      </button>
+
+      {open && (
+        <div
+          className="setting-menu-pop absolute bottom-full left-0 z-50 mb-2 min-w-[170px] rounded-lg border border-border bg-white p-1 shadow-lg"
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={() => {
+              onChange("");
+              setOpen(false);
+            }}
+            className={`flex w-full items-center gap-2 whitespace-nowrap rounded-md px-3 py-2 text-left text-sm transition-colors ${
+              !value ? "bg-primary/10 text-primary" : "text-foreground hover:bg-muted"
+            }`}
+          >
+            <span className="w-4 text-center text-xs opacity-60">{fallbackEmoji}</span>
+            <span className="font-medium">Any {label.toLowerCase()}</span>
+          </button>
+          {options.map((opt) => (
+            <button
+              key={opt}
+              onClick={() => {
+                onChange(opt);
+                setOpen(false);
+              }}
+              className={`flex w-full items-center gap-2 whitespace-nowrap rounded-md px-3 py-2 text-left text-sm transition-colors ${
+                value === opt ? "bg-primary/10 text-primary" : "text-foreground hover:bg-muted"
+              }`}
+            >
+              <span className="w-4 text-center text-xs">{emojis[opt] || fallbackEmoji}</span>
+              <span className="font-medium">{opt}</span>
+            </button>
+          ))}
         </div>
       )}
     </div>
