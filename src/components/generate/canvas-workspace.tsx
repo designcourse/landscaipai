@@ -113,9 +113,11 @@ function buildCanvasItems(
       finalized: gen.is_finalized ?? false,
       title: gen.is_finalized
         ? "HD · FINALIZED"
-        : gen.style_preset
-          ? STYLE_PRESETS.find((s) => s.id === gen.style_preset)?.name?.toUpperCase() ?? "AI GENERATED"
-          : "AI GENERATED",
+        : gen.concept_label
+          ? gen.concept_label.toUpperCase()
+          : gen.style_preset
+            ? STYLE_PRESETS.find((s) => s.id === gen.style_preset)?.name?.toUpperCase() ?? "AI GENERATED"
+            : "AI GENERATED",
       // DB-loaded: use custom_prompt from DB, plus settings summary
       userPrompt: gen.custom_prompt || undefined,
       settingsSummary: buildDisplayPrompt(gen) || undefined,
@@ -1336,6 +1338,7 @@ export function CanvasWorkspace({
         season: string | null;
         weather: string | null;
         image_model: string | null;
+        concept_label?: string | null;
         url: string;
       };
       const genList: GenData[] = Array.isArray(data.generations)
@@ -1385,9 +1388,11 @@ export function CanvasWorkspace({
                   id: genData.id,
                   url: genData.url,
                   status: "revealing" as const,
-                  title: genData.style_preset
-                    ? STYLE_PRESETS.find((s) => s.id === genData.style_preset)?.name?.toUpperCase() ?? "AI GENERATED"
-                    : "AI GENERATED",
+                  title: genData.concept_label
+                    ? genData.concept_label.toUpperCase()
+                    : genData.style_preset
+                      ? STYLE_PRESETS.find((s) => s.id === genData.style_preset)?.name?.toUpperCase() ?? "AI GENERATED"
+                      : "AI GENERATED",
                   generation: {
                     id: genData.id,
                     image_id: genData.image_id,

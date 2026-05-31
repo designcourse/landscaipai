@@ -92,6 +92,7 @@ export interface Generation {
   weather: string | null;
   is_inpaint: boolean;
   is_finalized?: boolean;
+  concept_label?: string | null;
   input_tokens: number | null;
   output_tokens: number | null;
   generation_cost_cents: number | null;

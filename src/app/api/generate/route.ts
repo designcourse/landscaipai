@@ -3,10 +3,11 @@ import sharp from "sharp";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { deductCredit, refundCredit } from "@/lib/utils/credits";
-import { buildPrompt, VARIATION_DIRECTIVES } from "@/lib/gemini/prompts";
+import { buildPrompt, VARIATION_DIRECTIVES, buildAspectGuardrails } from "@/lib/gemini/prompts";
+import { planConcepts, type PlannedConcept } from "@/lib/gemini/planner";
 import { getGenerationPath, BUCKET_GENERATIONS, BUCKET_UPLOADS, fetchLibraryImageParts } from "@/lib/utils/storage";
 import { getImageModel } from "@/lib/image-models";
-import { VARIATIONS_PER_GENERATION, VARIATION_MAX_DIMENSION } from "@/lib/image-models/config";
+import { VARIATIONS_PER_GENERATION, VARIATION_MAX_DIMENSION, PLANNER_ENABLED } from "@/lib/image-models/config";
 import { applyFreeTierWatermark } from "@/lib/utils/watermark";
 import { isPayingCustomer } from "@/lib/billing/status";
 
@@ -159,31 +160,58 @@ export async function POST(request: NextRequest) {
 
     const imageModel = getImageModel(model);
 
+    // AI landscaping planner (fresh generations only): analyzes the photo and
+    // returns budget-tiered, photo-tailored concepts. Falls back to the
+    // deterministic template if disabled, an iteration, or on any error.
+    let plannedConcepts: PlannedConcept[] | null = null;
+    if (PLANNER_ENABLED && !parentGenerationId && VARIATIONS_PER_GENERATION > 1) {
+      try {
+        const concepts = await planConcepts({ base64: modelInputBase64, mimeType, style, customPrompt });
+        if (concepts.length >= VARIATIONS_PER_GENERATION) {
+          plannedConcepts = concepts;
+          console.log(`[generate] planner produced ${concepts.length} concepts`);
+        } else {
+          console.warn(`[generate] planner returned ${concepts.length} concepts (<${VARIATIONS_PER_GENERATION}); using template`);
+        }
+      } catch (err) {
+        console.warn(`[generate] planner failed, using template:`, err instanceof Error ? err.message : err);
+      }
+    }
+
     // 5. Build N pending generation records grouped by a batch id. Each variant
-    //    gets a distinct "design direction" + seed so the batch is diverse.
+    //    gets a tailored planner concept (or a template directive) + a seed.
     const batchId = crypto.randomUUID();
     const variantCount = Math.max(1, VARIATIONS_PER_GENERATION);
     const variants = Array.from({ length: variantCount }, (_, index) => {
       const id = crypto.randomUUID();
-      const variationDirective =
-        variantCount > 1 ? VARIATION_DIRECTIVES[index % VARIATION_DIRECTIVES.length] : undefined;
-      const prompt = buildPrompt({
-        style: style ?? null,
-        timeOfDay,
-        season,
-        weather,
-        customPrompt,
-        selectedPlants,
-        selectedHardscape,
-        sourceWidth: targetWidth,
-        sourceHeight: targetHeight,
-        hasReferenceAttachments: (referenceImages?.length ?? 0) > 0,
-        variationDirective,
-      });
+      const concept = plannedConcepts?.[index];
+      let prompt: string;
+      let conceptLabel: string | null = null;
+      if (concept) {
+        conceptLabel = concept.tier || concept.name || null;
+        prompt = `${concept.prompt} ${buildAspectGuardrails(targetWidth, targetHeight)}`;
+      } else {
+        const variationDirective =
+          variantCount > 1 ? VARIATION_DIRECTIVES[index % VARIATION_DIRECTIVES.length] : undefined;
+        prompt = buildPrompt({
+          style: style ?? null,
+          timeOfDay,
+          season,
+          weather,
+          customPrompt,
+          selectedPlants,
+          selectedHardscape,
+          sourceWidth: targetWidth,
+          sourceHeight: targetHeight,
+          hasReferenceAttachments: (referenceImages?.length ?? 0) > 0,
+          variationDirective,
+        });
+      }
       return {
         index,
         id,
         prompt,
+        conceptLabel,
         storagePath: getGenerationPath(user.id, projectId, id),
         seed: Math.floor(Math.random() * 2_147_483_647),
       };
@@ -212,6 +240,7 @@ export async function POST(request: NextRequest) {
         is_inpaint: false,
         status: "pending",
         image_model: imageModel.name,
+        concept_label: v.conceptLabel,
       })),
     );
 
@@ -308,6 +337,7 @@ export async function POST(request: NextRequest) {
             image_model: imageModel.name,
             batch_id: batchId,
             variant_index: v.index,
+            concept_label: v.conceptLabel,
             url: urlData?.signedUrl ?? "",
           };
         } catch (err: unknown) {

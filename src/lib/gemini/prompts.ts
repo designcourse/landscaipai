@@ -279,6 +279,18 @@ export function buildPrompt(params: GenerationParams): string {
   return parts.join(" ");
 }
 
+/**
+ * Aspect-ratio + preservation guardrails (identical wording to buildPrompt),
+ * exported so AI-planner-generated prompts get the same constraints appended
+ * before they go to the image model.
+ */
+export function buildAspectGuardrails(sourceWidth: number, sourceHeight: number): string {
+  return (
+    `CRITICAL: The output image MUST have exactly the same aspect ratio as the input image (${sourceWidth}×${sourceHeight}). Do not crop, stretch, widen, or change the framing in any way. The camera angle, field of view, and composition must remain identical. ` +
+    "Keep the house structure, driveway, and all non-landscape elements completely intact. Make it look photorealistic and professional."
+  );
+}
+
 export function buildInpaintPrompt(params: InpaintParams): string {
   const sceneWide = params.hasSceneChange && (params.timeOfDay || params.season || params.weather);
 

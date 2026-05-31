@@ -23,3 +23,11 @@ export const VARIATIONS_PER_GENERATION = 3;
  * chosen design is a planned follow-up.
  */
 export const VARIATION_MAX_DIMENSION = 1024;
+
+/**
+ * When true, fresh (non-iteration) generations run the AI "landscaping planner"
+ * — a vision call that analyzes the photo and proposes budget-tiered, tailored
+ * design concepts — instead of the generic per-variant directives. Falls back
+ * to the template automatically if the planner errors. Flip to false to disable.
+ */
+export const PLANNER_ENABLED = true;
