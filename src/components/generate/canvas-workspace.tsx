@@ -110,9 +110,12 @@ function buildCanvasItems(
       naturalWidth: natWidth,
       naturalHeight: natHeight,
       generation: gen,
-      title: gen.style_preset
-        ? STYLE_PRESETS.find((s) => s.id === gen.style_preset)?.name?.toUpperCase() ?? "AI GENERATED"
-        : "AI GENERATED",
+      finalized: gen.is_finalized ?? false,
+      title: gen.is_finalized
+        ? "HD · FINALIZED"
+        : gen.style_preset
+          ? STYLE_PRESETS.find((s) => s.id === gen.style_preset)?.name?.toUpperCase() ?? "AI GENERATED"
+          : "AI GENERATED",
       // DB-loaded: use custom_prompt from DB, plus settings summary
       userPrompt: gen.custom_prompt || undefined,
       settingsSummary: buildDisplayPrompt(gen) || undefined,
@@ -1504,6 +1507,7 @@ export function CanvasWorkspace({
                 url: gen.url,
                 status: "revealing" as const,
                 title: "HD · FINALIZED",
+                finalized: true,
                 generation: {
                   id: gen.id,
                   image_id: gen.image_id,

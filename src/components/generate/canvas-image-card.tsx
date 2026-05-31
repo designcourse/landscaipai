@@ -20,6 +20,8 @@ export interface CanvasItem {
   settingsSummary?: string; // e.g. "Summer · Partly Cloudy"
   // For video items: "generating" shows start-frame poster with long-loading notice
   status?: "ready" | "generating" | "revealing";
+  /** True for an HD-finalized image generation — shows a "done" badge instead of the finalize action. */
+  finalized?: boolean;
   sourceUrl?: string; // URL of the source image (shown during generation animation)
   // Video-specific fields
   durationSeconds?: number;    // for display ("8s")
@@ -187,9 +189,17 @@ export const CanvasImageCard = memo(function CanvasImageCard({
   // when zoomed far out to avoid clutter.
   const showHdBadge =
     item.type === "generation" &&
+    !item.finalized &&
     !isGenerating &&
     !isRevealing &&
     !!onRequestFinalizeImage &&
+    zoom >= 0.4;
+  // Already-finalized HD generations show a non-interactive "done" badge instead.
+  const showDoneBadge =
+    item.type === "generation" &&
+    !!item.finalized &&
+    !isGenerating &&
+    !isRevealing &&
     zoom >= 0.4;
 
   // Trigger a download of the current item (image or video)
@@ -416,8 +426,8 @@ export const CanvasImageCard = memo(function CanvasImageCard({
           </div>
         )}
 
-        {/* Hover actions (Edit Region + 3-dot) plus the always-on "Finalize in HD" badge */}
-        {(showEditRegion || showHdBadge) && (
+        {/* Hover actions (Edit Region + 3-dot) plus the always-on HD badge (action or done state) */}
+        {(showEditRegion || showHdBadge || showDoneBadge) && (
           <div
             className="absolute right-4 top-4 flex items-center gap-2"
             style={{
@@ -471,6 +481,18 @@ export const CanvasImageCard = memo(function CanvasImageCard({
                 </svg>
                 HD
               </button>
+            )}
+            {showDoneBadge && (
+              <div
+                className="flex items-center gap-1.5 rounded-full bg-white px-4 py-2.5 text-sm font-bold shadow-lg"
+                style={{ color: "var(--color-primary)", border: "2px solid var(--color-primary)" }}
+                title="Already finalized in HD"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+                HD
+              </div>
             )}
           </div>
         )}

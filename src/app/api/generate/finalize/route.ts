@@ -101,6 +101,7 @@ export async function POST(request: NextRequest) {
       season: src.season,
       weather: src.weather,
       is_inpaint: false,
+      is_finalized: true,
       status: "pending",
       image_model: imageModel.name,
     });
