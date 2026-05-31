@@ -15,7 +15,7 @@ export function LandingCTA() {
         </div>
         <div className="cta-foot reveal" data-delay="2">
           <span>No credit card</span>
-          <span>10 free designs</span>
+          <span>3 free designs</span>
           <span>45-second first render</span>
         </div>
       </div>

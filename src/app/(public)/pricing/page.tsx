@@ -25,7 +25,7 @@ export default function PricingPage() {
             Free to start. Pay only for what you use.
           </h1>
           <p className="mx-auto mt-tight max-w-2xl text-base text-muted-foreground">
-            10 free designs on signup. After that, buy credits in any size —
+            3 free designs on signup. After that, buy credits in any size —
             they never expire.
           </p>
         </header>

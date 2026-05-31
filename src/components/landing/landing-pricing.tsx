@@ -61,7 +61,7 @@ export function LandingPricing() {
           Free to start. <em>Pay only</em> for what you use.
         </h2>
         <p className="sec-sub">
-          10 free designs on signup. After that, buy credits in any size — they
+          3 free designs on signup. After that, buy credits in any size — they
           never expire.
         </p>
       </div>
