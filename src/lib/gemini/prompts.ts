@@ -291,6 +291,52 @@ export function buildAspectGuardrails(sourceWidth: number, sourceHeight: number)
   );
 }
 
+/**
+ * The plant / hardscape / time / season / weather / reference-attachment lines
+ * (same wording buildPrompt uses), as one string — appended to AI-planner
+ * prompts so the planner path honors the same settings + library selections as
+ * the template path.
+ */
+export function buildDetailLines(params: {
+  timeOfDay?: string;
+  season?: string;
+  weather?: string;
+  selectedPlants?: SelectedPlant[];
+  selectedHardscape?: SelectedHardscape[];
+  hasReferenceAttachments?: boolean;
+}): string {
+  const lines: string[] = [];
+
+  if (params.selectedPlants?.length) {
+    const list = formatItemList(params.selectedPlants, true);
+    lines.push(
+      hasReferenceImages(params.selectedPlants)
+        ? `Include the following specific plants in the design. Reference images are provided to show the species — use them to identify the correct plant type, leaf shape, color, and flower style, but each individual plant placed in the scene MUST look naturally unique (vary the size, shape, branching pattern, and maturity). Do NOT duplicate or clone the same plant image multiple times. Place plants in contextually appropriate locations (in garden beds, lawns, borders) with realistic spacing — never overlapping structures or pressed against the house:\n${list}`
+        : `Include the following specific plants in the design: ${list}.`
+    );
+  }
+
+  if (params.selectedHardscape?.length) {
+    const list = formatItemList(params.selectedHardscape, false);
+    lines.push(
+      hasReferenceImages(params.selectedHardscape)
+        ? `Include the following hardscape elements. Reference images are provided to show the material and style — use them as a guide for texture, color, and type, but integrate each element naturally into the scene with realistic scale and placement:\n${list}`
+        : `Include the following hardscape elements: ${list}.`
+    );
+  }
+
+  if (params.timeOfDay) lines.push(`Time of day: ${params.timeOfDay}.`);
+  if (params.season) lines.push(`Season: ${params.season}.`);
+  if (params.weather) lines.push(`Weather conditions: ${params.weather}.`);
+  if (params.hasReferenceAttachments) {
+    lines.push(
+      "Additional reference images have been attached by the user. Use them as visual context — they may show specific features, materials, styles, or elements the user wants incorporated or matched in the design. Follow the user's custom instructions regarding how to use these references."
+    );
+  }
+
+  return lines.join(" ");
+}
+
 export function buildInpaintPrompt(params: InpaintParams): string {
   const sceneWide = params.hasSceneChange && (params.timeOfDay || params.season || params.weather);
 

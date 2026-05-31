@@ -14,8 +14,8 @@ export interface PlannedConcept {
   prompt: string;
 }
 
-function plannerInstruction(styleLine: string, customLine: string): string {
-  return `You are an expert residential landscape designer helping a homeowner improve the FRONT YARD in the attached photo. They want a tasteful improvement and they care about budget.${styleLine}${customLine}
+function plannerInstruction(styleLine: string, customLine: string, reqLine: string): string {
+  return `You are an expert residential landscape designer helping a homeowner improve the FRONT YARD in the attached photo. They want a tasteful improvement and they care about budget.${styleLine}${customLine}${reqLine}
 
 Analyze the photo, then propose THREE concepts at three budget tiers:
 1. "Budget-Friendly": simple, high-impact, low-cost — fresh mulch beds with clean edging, a few foundation shrubs, some perennials/flowers, maybe one small tree. Modest but noticeably nicer.
@@ -47,6 +47,12 @@ export async function planConcepts(input: {
   mimeType: string;
   style?: string | null;
   customPrompt?: string;
+  timeOfDay?: string;
+  season?: string;
+  weather?: string;
+  selectedPlants?: { common_name: string }[];
+  selectedHardscape?: { common_name: string }[];
+  hasReferenceAttachments?: boolean;
 }): Promise<PlannedConcept[]> {
   const preset = input.style ? STYLE_PRESETS.find((p) => p.id === input.style) : null;
   const styleLine = preset
@@ -55,7 +61,21 @@ export async function planConcepts(input: {
   const customLine = input.customPrompt?.trim()
     ? ` The homeowner specifically asked: "${input.customPrompt.trim()}" — honor this in every tier, scaling the execution to each budget.`
     : "";
-  const instruction = plannerInstruction(styleLine, customLine);
+
+  const settings: string[] = [];
+  if (input.timeOfDay) settings.push(`time of day: ${input.timeOfDay}`);
+  if (input.season) settings.push(`season: ${input.season}`);
+  if (input.weather) settings.push(`weather: ${input.weather}`);
+  const plantNames = (input.selectedPlants ?? []).map((p) => p.common_name).filter(Boolean);
+  const hardNames = (input.selectedHardscape ?? []).map((h) => h.common_name).filter(Boolean);
+  const reqBits: string[] = [];
+  if (settings.length) reqBits.push(`render every concept at ${settings.join(", ")}`);
+  if (plantNames.length) reqBits.push(`prominently feature the homeowner's chosen plants (${plantNames.join(", ")})`);
+  if (hardNames.length) reqBits.push(`include these hardscape elements (${hardNames.join(", ")})`);
+  if (input.hasReferenceAttachments) reqBits.push("match the materials and style shown in the homeowner's attached reference images");
+  const reqLine = reqBits.length ? ` IMPORTANT — honor ALL of these in EVERY concept: ${reqBits.join("; ")}.` : "";
+
+  const instruction = plannerInstruction(styleLine, customLine, reqLine);
 
   let lastErr: unknown;
   for (const model of PLANNER_MODELS) {

@@ -3,7 +3,7 @@ import sharp from "sharp";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { deductCredit, refundCredit } from "@/lib/utils/credits";
-import { buildPrompt, VARIATION_DIRECTIVES, buildAspectGuardrails } from "@/lib/gemini/prompts";
+import { buildPrompt, VARIATION_DIRECTIVES, buildAspectGuardrails, buildDetailLines } from "@/lib/gemini/prompts";
 import { planConcepts, type PlannedConcept } from "@/lib/gemini/planner";
 import { getGenerationPath, BUCKET_GENERATIONS, BUCKET_UPLOADS, fetchLibraryImageParts } from "@/lib/utils/storage";
 import { getImageModel } from "@/lib/image-models";
@@ -166,7 +166,18 @@ export async function POST(request: NextRequest) {
     let plannedConcepts: PlannedConcept[] | null = null;
     if (PLANNER_ENABLED && !parentGenerationId && VARIATIONS_PER_GENERATION > 1) {
       try {
-        const concepts = await planConcepts({ base64: modelInputBase64, mimeType, style, customPrompt });
+        const concepts = await planConcepts({
+          base64: modelInputBase64,
+          mimeType,
+          style,
+          customPrompt,
+          timeOfDay,
+          season,
+          weather,
+          selectedPlants,
+          selectedHardscape,
+          hasReferenceAttachments: (referenceImages?.length ?? 0) > 0,
+        });
         if (concepts.length >= VARIATIONS_PER_GENERATION) {
           plannedConcepts = concepts;
           console.log(`[generate] planner produced ${concepts.length} concepts`);
@@ -189,7 +200,17 @@ export async function POST(request: NextRequest) {
       let conceptLabel: string | null = null;
       if (concept) {
         conceptLabel = concept.tier || concept.name || null;
-        prompt = `${concept.prompt} ${buildAspectGuardrails(targetWidth, targetHeight)}`;
+        const details = buildDetailLines({
+          timeOfDay,
+          season,
+          weather,
+          selectedPlants,
+          selectedHardscape,
+          hasReferenceAttachments: (referenceImages?.length ?? 0) > 0,
+        });
+        prompt = [concept.prompt, details, buildAspectGuardrails(targetWidth, targetHeight)]
+          .filter(Boolean)
+          .join(" ");
       } else {
         const variationDirective =
           variantCount > 1 ? VARIATION_DIRECTIVES[index % VARIATION_DIRECTIVES.length] : undefined;
