@@ -1,10 +1,11 @@
 import { GoogleGenAI } from "@google/genai";
 import { STYLE_PRESETS } from "./prompts";
 
-// Vision/reasoning models for the planner, newest first. NOTE: "gemini-3-flash"
-// 404s on the Developer API; "gemini-flash-latest" is the working Gemini-3-class
-// flash text model. The chain falls back if a model is unavailable.
-const PLANNER_MODELS = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash"];
+// Vision/reasoning models for the planner, newest first. "gemini-3.5-flash" is
+// GA on the Developer API and handles image input + JSON output (verified
+// against our key); "gemini-3-flash" does NOT exist (404). The chain falls back
+// if a model is unavailable.
+const PLANNER_MODELS = ["gemini-3.5-flash", "gemini-flash-latest", "gemini-2.5-flash"];
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
