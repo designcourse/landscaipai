@@ -154,7 +154,42 @@ export default function PrivacyPage() {
                 </a>
                 .
               </li>
+              <li>
+                <strong>Twilio Inc.</strong> — SMS text messaging to customers
+                who have opted in (reminders, quotes, invoices).{" "}
+                <a
+                  href="https://www.twilio.com/legal/privacy"
+                  className="text-primary hover:underline"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Privacy Policy
+                </a>
+                .
+              </li>
+              <li>
+                <strong>Resend</strong> — Transactional email delivery.{" "}
+                <a
+                  href="https://resend.com/legal/privacy-policy"
+                  className="text-primary hover:underline"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Privacy Policy
+                </a>
+                .
+              </li>
             </ul>
+            <p className="mt-tight">
+              <strong>
+                We do not sell your personal information, and we never share
+                your mobile phone number or SMS opt-in consent with third
+                parties or affiliates for their own marketing.
+              </strong>{" "}
+              Text-message consent you give to a landscaper is used only to send
+              you service messages from that business — it is not shared for any
+              other purpose.
+            </p>
             <p className="mt-tight">
               We may also disclose information when required by law, to
               enforce our Terms, to protect the rights, safety, and property

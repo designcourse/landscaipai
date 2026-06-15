@@ -294,7 +294,38 @@ export default function TermsPage() {
             </p>
           </Section>
 
-          <Section title="16. Contact">
+          <Section title="16. Text messaging (SMS)">
+            <p>
+              Landscapers who use the Service may send you transactional text
+              messages about your service — for example, appointment and job
+              reminders, quotes, and invoices (the &ldquo;Messaging
+              Program&rdquo;). You consent to receive these messages by
+              providing your mobile number and opting in (for example, by
+              checking the consent box on a landscaper&rsquo;s request form).
+              Consent to receive texts is not a condition of any purchase.
+            </p>
+            <p className="mt-3">
+              Message frequency varies.{" "}
+              <strong>Message and data rates may apply.</strong> Reply{" "}
+              <strong>STOP</strong> to any message to unsubscribe at any time, or{" "}
+              <strong>HELP</strong> for help. Carriers are not liable for delayed
+              or undelivered messages. For support, email{" "}
+              <a
+                href="mailto:support@landscaip.co"
+                className="text-primary hover:underline"
+              >
+                support@landscaip.co
+              </a>
+              . Mobile opt-in information is never shared with third parties or
+              sold, and is not used for marketing — see our{" "}
+              <Link href="/privacy" className="text-primary hover:underline">
+                Privacy Policy
+              </Link>
+              .
+            </p>
+          </Section>
+
+          <Section title="17. Contact">
             <p>
               Questions about these Terms? Contact us at{" "}
               <a
