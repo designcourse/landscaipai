@@ -1628,7 +1628,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--font-mono, ui-monospace);
+  font-family: inherit;
   font-size: 13px;
   font-weight: 600;
   color: var(--ls-fg);
@@ -1670,7 +1670,7 @@
   align-items: center;
   justify-content: center;
   color: var(--ls-muted-fg);
-  font-family: var(--font-mono, ui-monospace);
+  font-family: inherit;
   font-size: 12px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1682,6 +1682,1757 @@
   border-radius: 9999px;
   border: 1px solid var(--ls-border);
 }
+
+/* ----------------------------------------------------------
+   Step 01 media — "drop to upload" animated mock
+   One shared loop (var(--loop)); each part has its own
+   @keyframes at the same duration so they stay in sync.
+   Parts are paused until the mock scrolls into view (.playing).
+   ---------------------------------------------------------- */
+.landing-root .how-step .step-media.upmock {
+  --loop: 7s;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 16px;
+  background: var(--ls-panel);
+  border: 1px solid var(--ls-panel-border-strong);
+  box-shadow: var(--ls-shadow-card-canvas);
+  font-family: inherit;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--ls-fg);
+}
+.landing-root .step-media.upmock::after {
+  content: none;
+}
+
+.landing-root .upmock-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.landing-root .upmock-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ls-fg);
+}
+.landing-root .upmock-eyebrow .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--ls-primary);
+}
+.landing-root .upmock-step {
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--ls-panel-muted);
+}
+
+.landing-root .upmock-zone {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  border: 1.5px dashed var(--ls-canvas-input-border);
+  border-radius: 12px;
+  background: var(--ls-canvas-input-bg);
+  overflow: hidden;
+}
+
+/* Empty state */
+.landing-root .upmock-prompt {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-align: center;
+  padding: 12px;
+}
+.landing-root .upmock-prompt-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  border: 1px solid var(--ls-panel-border-strong);
+  color: var(--ls-primary);
+  margin-bottom: 4px;
+}
+.landing-root .upmock-prompt-icon svg {
+  width: 20px;
+  height: 20px;
+}
+.landing-root .upmock-prompt-main {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ls-fg);
+}
+.landing-root .upmock-prompt-sub {
+  font-size: 12px;
+  color: var(--ls-panel-muted);
+}
+
+/* The dropped-in photo */
+.landing-root .upmock-photo {
+  position: absolute;
+  inset: 12px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--ls-panel);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.08),
+    0 16px 30px -10px rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  transform: translateY(-118%) rotate(-7deg) scale(0.94);
+  will-change: transform, opacity;
+}
+.landing-root .upmock-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.landing-root .upmock-scan {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -45%;
+  height: 36%;
+  opacity: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    rgba(45, 163, 30, 0) 0%,
+    rgba(45, 163, 30, 0.08) 60%,
+    rgba(90, 200, 70, 0.34) 92%,
+    rgba(170, 250, 150, 0.7) 100%
+  );
+  box-shadow: 0 3px 12px rgba(45, 163, 30, 0.28);
+}
+
+.landing-root .upmock-progress {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  height: 5px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(2px);
+  overflow: hidden;
+  opacity: 0;
+}
+.landing-root .upmock-progress > span {
+  display: block;
+  height: 100%;
+  width: 0%;
+  border-radius: 9999px;
+  background: linear-gradient(
+    90deg,
+    var(--ls-primary),
+    var(--ls-primary-light)
+  );
+}
+
+.landing-root .upmock-filemeta {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 9px;
+  border-radius: 9999px;
+  background: rgba(20, 22, 18, 0.62);
+  backdrop-filter: blur(4px);
+  opacity: 0;
+}
+.landing-root .upmock-filename {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+}
+.landing-root .upmock-filesize {
+  font-family: inherit;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.landing-root .upmock-check {
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  width: 28px;
+  height: 28px;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ls-primary);
+  color: #fff;
+  box-shadow:
+    0 2px 6px rgba(15, 128, 0, 0.4),
+    0 0 0 4px rgba(255, 255, 255, 0.55);
+  opacity: 0;
+  transform: scale(0.2);
+}
+.landing-root .upmock-check svg {
+  width: 15px;
+  height: 15px;
+}
+
+.landing-root .upmock-cursor {
+  position: absolute;
+  left: 52%;
+  top: 2%;
+  width: 22px;
+  height: 22px;
+  opacity: 0;
+  pointer-events: none;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.3));
+  transform: translate(-50%, 0);
+}
+.landing-root .upmock-cursor svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Format chips */
+.landing-root .upmock-formats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.landing-root .upmock-chip {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 5px 11px;
+  border-radius: 9999px;
+  background: #fff;
+  border: 1px solid var(--ls-panel-border-strong);
+  color: var(--ls-panel-muted);
+}
+
+/* Run the loop only while in view */
+.landing-root .upmock.playing .upmock-photo {
+  animation: upmock-photo var(--loop) cubic-bezier(0.34, 1.12, 0.5, 1) infinite;
+}
+.landing-root .upmock.playing .upmock-prompt {
+  animation: upmock-prompt var(--loop) ease infinite;
+}
+.landing-root .upmock.playing .upmock-cursor {
+  animation: upmock-cursor var(--loop) cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+.landing-root .upmock.playing .upmock-scan {
+  animation: upmock-scan var(--loop) ease-in infinite;
+}
+.landing-root .upmock.playing .upmock-progress {
+  animation: upmock-progress var(--loop) ease infinite;
+}
+.landing-root .upmock.playing .upmock-progress > span {
+  animation: upmock-fill var(--loop) linear infinite;
+}
+.landing-root .upmock.playing .upmock-filemeta {
+  animation: upmock-filemeta var(--loop) ease infinite;
+}
+.landing-root .upmock.playing .upmock-check {
+  animation: upmock-check var(--loop) cubic-bezier(0.34, 1.56, 0.5, 1) infinite;
+}
+.landing-root .upmock.playing .upmock-chip {
+  animation: upmock-chip 3.6s ease-in-out infinite;
+}
+.landing-root .upmock.playing .upmock-chip[data-i="1"] {
+  animation-delay: 1.2s;
+}
+.landing-root .upmock.playing .upmock-chip[data-i="2"] {
+  animation-delay: 2.4s;
+}
+
+@keyframes upmock-photo {
+  0%,
+  12% {
+    opacity: 0;
+    transform: translateY(-118%) rotate(-7deg) scale(0.94);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(2.5%) rotate(0.6deg) scale(1.004);
+  }
+  34%,
+  86% {
+    opacity: 1;
+    transform: translateY(0) rotate(0deg) scale(1);
+  }
+  94% {
+    opacity: 0;
+    transform: translateY(0) rotate(0deg) scale(0.965);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-118%) rotate(-7deg) scale(0.94);
+  }
+}
+
+@keyframes upmock-prompt {
+  0%,
+  16% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  26%,
+  88% {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.96);
+  }
+  97%,
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes upmock-cursor {
+  0%,
+  10% {
+    top: 2%;
+    opacity: 0;
+    transform: translate(-50%, 0) scale(0.8);
+  }
+  16% {
+    top: 7%;
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+  30% {
+    top: 54%;
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+  34% {
+    top: 52%;
+    opacity: 1;
+    transform: translate(-50%, 0) scale(0.85);
+  }
+  38% {
+    top: 54%;
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+  48% {
+    top: 58%;
+    opacity: 0;
+    transform: translate(-44%, 0) scale(1);
+  }
+  100% {
+    top: 2%;
+    opacity: 0;
+    transform: translate(-50%, 0) scale(0.8);
+  }
+}
+
+@keyframes upmock-scan {
+  0%,
+  34% {
+    top: -45%;
+    opacity: 0;
+  }
+  37% {
+    opacity: 0.85;
+  }
+  54% {
+    opacity: 0.85;
+  }
+  57% {
+    top: 100%;
+    opacity: 0;
+  }
+  100% {
+    top: 100%;
+    opacity: 0;
+  }
+}
+
+@keyframes upmock-progress {
+  0%,
+  33% {
+    opacity: 0;
+  }
+  36%,
+  58% {
+    opacity: 1;
+  }
+  63%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes upmock-fill {
+  0%,
+  34% {
+    width: 0%;
+  }
+  55%,
+  100% {
+    width: 100%;
+  }
+}
+
+@keyframes upmock-filemeta {
+  0%,
+  58% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  66%,
+  88% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  94%,
+  100% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@keyframes upmock-check {
+  0%,
+  55% {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+  62% {
+    opacity: 1;
+    transform: scale(1.18);
+  }
+  66%,
+  88% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  93%,
+  100% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+}
+
+@keyframes upmock-chip {
+  0%,
+  100% {
+    background: #fff;
+    border-color: var(--ls-panel-border-strong);
+    color: var(--ls-panel-muted);
+  }
+  8%,
+  25% {
+    background: var(--ls-credits-badge-bg);
+    border-color: var(--ls-primary);
+    color: var(--ls-primary-dark);
+  }
+  40% {
+    background: #fff;
+    border-color: var(--ls-panel-border-strong);
+    color: var(--ls-panel-muted);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-root .upmock.playing .upmock-photo,
+  .landing-root .upmock.playing .upmock-prompt,
+  .landing-root .upmock.playing .upmock-cursor,
+  .landing-root .upmock.playing .upmock-scan,
+  .landing-root .upmock.playing .upmock-progress,
+  .landing-root .upmock.playing .upmock-progress > span,
+  .landing-root .upmock.playing .upmock-filemeta,
+  .landing-root .upmock.playing .upmock-check,
+  .landing-root .upmock.playing .upmock-chip {
+    animation: none;
+  }
+  /* Freeze on the finished "uploaded" state */
+  .landing-root .upmock .upmock-photo {
+    opacity: 1;
+    transform: none;
+  }
+  .landing-root .upmock .upmock-prompt,
+  .landing-root .upmock .upmock-scan,
+  .landing-root .upmock .upmock-progress,
+  .landing-root .upmock .upmock-cursor {
+    opacity: 0;
+  }
+  .landing-root .upmock .upmock-filemeta,
+  .landing-root .upmock .upmock-check {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ----------------------------------------------------------
+   Step 02 media — "generate a design" animated mock.
+   Reuses the .upmock panel chrome; .genmock layers the stage,
+   controls (style preset + asset + custom instructions) and a
+   Generate action that transforms the uploaded yard into a design.
+   ---------------------------------------------------------- */
+.landing-root .how-step .step-media.genmock {
+  --loop: 16s;
+  gap: 11px;
+}
+
+.landing-root .genmock-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  border-radius: 11px;
+  overflow: hidden;
+  border: 1px solid var(--ls-panel-border-strong);
+  background: #1b1d18;
+}
+.landing-root .genmock-before,
+.landing-root .genmock-after {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.landing-root .genmock-after {
+  opacity: 0;
+}
+
+.landing-root .genmock-shimmer {
+  position: absolute;
+  top: -25%;
+  bottom: -25%;
+  left: 0;
+  width: 42%;
+  opacity: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0) 36%,
+    rgba(214, 255, 200, 0.55) 50%,
+    rgba(255, 255, 255, 0) 64%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  filter: blur(1px);
+  transform: translateX(-140%) skewX(-12deg);
+}
+
+.landing-root .genmock-genchip {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 13px;
+  border-radius: 9999px;
+  background: rgba(20, 22, 18, 0.66);
+  backdrop-filter: blur(4px);
+  color: #fff;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.96);
+}
+.landing-root .genmock-spark {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    var(--ls-primary-light),
+    #c4ff9e,
+    var(--ls-primary),
+    var(--ls-primary-light)
+  );
+}
+
+.landing-root .genmock-results {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  display: flex;
+  gap: 7px;
+  opacity: 0;
+  transform: translateY(10px);
+}
+.landing-root .genmock-thumb {
+  width: 52px;
+  height: 38px;
+  border-radius: 7px;
+  background-size: cover;
+  background-position: center;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  box-shadow: var(--ls-shadow-md);
+}
+.landing-root .genmock-count {
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  display: inline-grid;
+}
+.landing-root .genmock-count span {
+  grid-area: 1 / 1;
+  padding: 4px 9px;
+  border-radius: 9999px;
+  background: rgba(20, 22, 18, 0.62);
+  backdrop-filter: blur(4px);
+  color: #fff;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  opacity: 0;
+}
+
+.landing-root .genmock-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.landing-root .genmock-chips {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.landing-root .genmock-style {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  padding: 5px 11px;
+  border-radius: 9999px;
+  background: #fff;
+  border: 1px solid var(--ls-panel-border-strong);
+  color: var(--ls-panel-muted);
+  white-space: nowrap;
+}
+.landing-root .genmock-asset {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 11px 4px 4px;
+  border-radius: 9999px;
+  background: var(--ls-credits-badge-bg);
+  border: 1px solid var(--ls-primary);
+  color: var(--ls-primary-dark);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  transform: scale(0.6);
+}
+.landing-root .genmock-asset img {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #fff;
+}
+
+.landing-root .genmock-promptrow {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+.landing-root .genmock-prompt {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: var(--ls-canvas-input-bg);
+  border: 1px solid var(--ls-canvas-input-border);
+  overflow: hidden;
+}
+.landing-root .genmock-typed {
+  font-family: inherit;
+  font-size: 12.5px;
+  line-height: 1;
+  color: var(--ls-fg);
+  white-space: nowrap;
+  /* Revealed left-to-right via clip-path so the typewriter is font-agnostic
+     (a sans font has no fixed character width, so the old ch-based width
+     reveal would mis-measure). */
+  clip-path: inset(0 100% 0 0);
+  border-right: 2px solid transparent;
+  padding-right: 2px;
+}
+.landing-root .genmock-generate {
+  position: relative;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 138px;
+  height: 38px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 10px;
+  background: var(--ls-primary);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: default;
+  box-shadow: 0 2px 6px rgba(15, 128, 0, 0.28);
+}
+.landing-root .genmock-gen-idle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.landing-root .genmock-gen-idle img {
+  width: 17px;
+  height: 17px;
+}
+.landing-root .genmock-gen-busy {
+  position: absolute;
+  left: 0;
+  right: 0;
+  text-align: center;
+  opacity: 0;
+}
+
+.landing-root .genmock-cursor {
+  position: absolute;
+  left: 58%;
+  top: 74%;
+  width: 22px;
+  height: 22px;
+  opacity: 0;
+  pointer-events: none;
+  transform-origin: top left;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.3));
+  z-index: 5;
+}
+.landing-root .genmock-cursor svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Run the loop only while in view */
+.landing-root .genmock.playing .genmock-style[data-i="0"] {
+  animation: genmock-style-on var(--loop) ease infinite;
+}
+.landing-root .genmock.playing .genmock-asset {
+  animation: genmock-asset-in var(--loop) cubic-bezier(0.34, 1.4, 0.5, 1) infinite;
+}
+.landing-root .genmock.playing .genmock-typed {
+  animation:
+    genmock-type var(--loop) steps(23, end) infinite,
+    genmock-caret 0.9s steps(1) infinite;
+}
+.landing-root .genmock.playing .genmock-cursor {
+  animation: genmock-cursor var(--loop) cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+.landing-root .genmock.playing .genmock-generate {
+  animation: genmock-gen-pulse var(--loop) ease infinite;
+}
+.landing-root .genmock.playing .genmock-gen-idle {
+  animation: genmock-gen-idle var(--loop) ease infinite;
+}
+.landing-root .genmock.playing .genmock-gen-busy {
+  animation: genmock-gen-busy var(--loop) ease infinite;
+}
+.landing-root .genmock.playing .genmock-shimmer {
+  animation: genmock-shimmer var(--loop) ease-in-out infinite;
+}
+.landing-root .genmock.playing .genmock-after[data-i="0"] {
+  animation: genmock-after-0 var(--loop) ease infinite;
+}
+.landing-root .genmock.playing .genmock-after[data-i="1"] {
+  animation: genmock-after-1 var(--loop) ease infinite;
+}
+.landing-root .genmock.playing .genmock-after[data-i="2"] {
+  animation: genmock-after-2 var(--loop) ease infinite;
+}
+.landing-root .genmock.playing .genmock-genchip {
+  animation: genmock-genchip var(--loop) ease infinite;
+}
+.landing-root .genmock.playing .genmock-spark {
+  animation: genmock-spin 1s linear infinite;
+}
+.landing-root .genmock.playing .genmock-results {
+  animation: genmock-results var(--loop) cubic-bezier(0.2, 0.7, 0.2, 1) infinite;
+}
+.landing-root .genmock.playing .genmock-thumb[data-i="0"] {
+  animation: genmock-thumb-0 var(--loop) ease infinite;
+}
+.landing-root .genmock.playing .genmock-thumb[data-i="1"] {
+  animation: genmock-thumb-1 var(--loop) ease infinite;
+}
+.landing-root .genmock.playing .genmock-thumb[data-i="2"] {
+  animation: genmock-thumb-2 var(--loop) ease infinite;
+}
+.landing-root .genmock.playing .genmock-count span[data-i="0"] {
+  animation: genmock-count-0 var(--loop) ease infinite;
+}
+.landing-root .genmock.playing .genmock-count span[data-i="1"] {
+  animation: genmock-count-1 var(--loop) ease infinite;
+}
+.landing-root .genmock.playing .genmock-count span[data-i="2"] {
+  animation: genmock-count-2 var(--loop) ease infinite;
+}
+
+/* Timeline (16s loop): setup + generate 0–42%, then each of the 3
+   designs holds the stage for ~3s (40–58, 58–77, 77–95), reset 95–100. */
+@keyframes genmock-style-on {
+  0%,
+  4% {
+    background: #fff;
+    border-color: var(--ls-panel-border-strong);
+    color: var(--ls-panel-muted);
+    transform: scale(1);
+  }
+  6% {
+    transform: scale(1.09);
+  }
+  9%,
+  93% {
+    background: var(--ls-credits-badge-bg);
+    border-color: var(--ls-primary);
+    color: var(--ls-primary-dark);
+    transform: scale(1);
+  }
+  97%,
+  100% {
+    background: #fff;
+    border-color: var(--ls-panel-border-strong);
+    color: var(--ls-panel-muted);
+    transform: scale(1);
+  }
+}
+
+@keyframes genmock-asset-in {
+  0%,
+  9% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  13% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+  16%,
+  93% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  97%,
+  100% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+@keyframes genmock-type {
+  0%,
+  12% {
+    clip-path: inset(0 100% 0 0);
+  }
+  29% {
+    clip-path: inset(0 0 0 0);
+  }
+  93% {
+    clip-path: inset(0 0 0 0);
+  }
+  94%,
+  100% {
+    clip-path: inset(0 100% 0 0);
+  }
+}
+
+@keyframes genmock-caret {
+  0%,
+  50% {
+    border-right-color: var(--ls-primary);
+  }
+  51%,
+  100% {
+    border-right-color: transparent;
+  }
+}
+
+@keyframes genmock-cursor {
+  0%,
+  22% {
+    opacity: 0;
+    left: 58%;
+    top: 74%;
+    transform: scale(0.8);
+  }
+  27% {
+    opacity: 1;
+    left: 72%;
+    top: 82%;
+    transform: scale(1);
+  }
+  31% {
+    opacity: 1;
+    left: 87%;
+    top: 86%;
+    transform: scale(1);
+  }
+  33% {
+    opacity: 1;
+    left: 87%;
+    top: 86%;
+    transform: scale(0.82);
+  }
+  35% {
+    opacity: 1;
+    left: 87%;
+    top: 86%;
+    transform: scale(1);
+  }
+  40% {
+    opacity: 0;
+    left: 89%;
+    top: 88%;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    left: 58%;
+    top: 74%;
+    transform: scale(0.8);
+  }
+}
+
+@keyframes genmock-gen-pulse {
+  0%,
+  30% {
+    transform: scale(1);
+    box-shadow: 0 2px 6px rgba(15, 128, 0, 0.28);
+  }
+  32% {
+    transform: scale(0.95);
+  }
+  34% {
+    transform: scale(1);
+  }
+  35%,
+  40% {
+    box-shadow:
+      0 0 0 4px rgba(15, 128, 0, 0.16),
+      0 2px 8px rgba(15, 128, 0, 0.32);
+  }
+  42%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 2px 6px rgba(15, 128, 0, 0.28);
+  }
+}
+
+@keyframes genmock-gen-idle {
+  0%,
+  31% {
+    opacity: 1;
+  }
+  33%,
+  40% {
+    opacity: 0;
+  }
+  42%,
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes genmock-gen-busy {
+  0%,
+  32% {
+    opacity: 0;
+  }
+  34%,
+  39% {
+    opacity: 1;
+  }
+  41%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes genmock-shimmer {
+  0%,
+  31% {
+    opacity: 0;
+    transform: translateX(-140%) skewX(-12deg);
+  }
+  35% {
+    opacity: 0.85;
+  }
+  39% {
+    opacity: 0.85;
+  }
+  41% {
+    opacity: 0;
+    transform: translateX(175%) skewX(-12deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(175%) skewX(-12deg);
+  }
+}
+
+/* Design 1 — holds 40–58%, fades out at reset */
+@keyframes genmock-after-0 {
+  0%,
+  37% {
+    opacity: 0;
+    transform: scale(1.04);
+  }
+  40%,
+  95% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  99%,
+  100% {
+    opacity: 0;
+    transform: scale(1.02);
+  }
+}
+/* Design 2 — cross-fades in over design 1 at 58% */
+@keyframes genmock-after-1 {
+  0%,
+  57% {
+    opacity: 0;
+  }
+  61%,
+  95% {
+    opacity: 1;
+  }
+  99%,
+  100% {
+    opacity: 0;
+  }
+}
+/* Design 3 — cross-fades in over design 2 at 77% */
+@keyframes genmock-after-2 {
+  0%,
+  76% {
+    opacity: 0;
+  }
+  80%,
+  95% {
+    opacity: 1;
+  }
+  99%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes genmock-genchip {
+  0%,
+  30% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.96);
+  }
+  33%,
+  38% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  41%,
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.96);
+  }
+}
+
+@keyframes genmock-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes genmock-results {
+  0%,
+  38% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  42%,
+  95% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  99%,
+  100% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+/* Each thumbnail rings green while its design holds the stage */
+@keyframes genmock-thumb-0 {
+  0%,
+  39% {
+    border-color: rgba(255, 255, 255, 0.85);
+    box-shadow: var(--ls-shadow-md);
+  }
+  41%,
+  57% {
+    border-color: var(--ls-primary);
+    box-shadow:
+      0 0 0 2px rgba(15, 128, 0, 0.4),
+      var(--ls-shadow-md);
+  }
+  59%,
+  100% {
+    border-color: rgba(255, 255, 255, 0.85);
+    box-shadow: var(--ls-shadow-md);
+  }
+}
+@keyframes genmock-thumb-1 {
+  0%,
+  57% {
+    border-color: rgba(255, 255, 255, 0.85);
+    box-shadow: var(--ls-shadow-md);
+  }
+  60%,
+  76% {
+    border-color: var(--ls-primary);
+    box-shadow:
+      0 0 0 2px rgba(15, 128, 0, 0.4),
+      var(--ls-shadow-md);
+  }
+  78%,
+  100% {
+    border-color: rgba(255, 255, 255, 0.85);
+    box-shadow: var(--ls-shadow-md);
+  }
+}
+@keyframes genmock-thumb-2 {
+  0%,
+  76% {
+    border-color: rgba(255, 255, 255, 0.85);
+    box-shadow: var(--ls-shadow-md);
+  }
+  79%,
+  94% {
+    border-color: var(--ls-primary);
+    box-shadow:
+      0 0 0 2px rgba(15, 128, 0, 0.4),
+      var(--ls-shadow-md);
+  }
+  96%,
+  100% {
+    border-color: rgba(255, 255, 255, 0.85);
+    box-shadow: var(--ls-shadow-md);
+  }
+}
+
+/* "1 / 3" → "2 / 3" → "3 / 3" counter, synced to the thumbnails */
+@keyframes genmock-count-0 {
+  0%,
+  38% {
+    opacity: 0;
+  }
+  42%,
+  57% {
+    opacity: 1;
+  }
+  59%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes genmock-count-1 {
+  0%,
+  57% {
+    opacity: 0;
+  }
+  60%,
+  76% {
+    opacity: 1;
+  }
+  78%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes genmock-count-2 {
+  0%,
+  76% {
+    opacity: 0;
+  }
+  79%,
+  94% {
+    opacity: 1;
+  }
+  96%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-root .genmock.playing .genmock-style[data-i="0"],
+  .landing-root .genmock.playing .genmock-asset,
+  .landing-root .genmock.playing .genmock-typed,
+  .landing-root .genmock.playing .genmock-cursor,
+  .landing-root .genmock.playing .genmock-generate,
+  .landing-root .genmock.playing .genmock-gen-idle,
+  .landing-root .genmock.playing .genmock-gen-busy,
+  .landing-root .genmock.playing .genmock-shimmer,
+  .landing-root .genmock.playing .genmock-after[data-i="0"],
+  .landing-root .genmock.playing .genmock-after[data-i="1"],
+  .landing-root .genmock.playing .genmock-after[data-i="2"],
+  .landing-root .genmock.playing .genmock-genchip,
+  .landing-root .genmock.playing .genmock-spark,
+  .landing-root .genmock.playing .genmock-results,
+  .landing-root .genmock.playing .genmock-thumb[data-i="0"],
+  .landing-root .genmock.playing .genmock-thumb[data-i="1"],
+  .landing-root .genmock.playing .genmock-thumb[data-i="2"],
+  .landing-root .genmock.playing .genmock-count span {
+    animation: none;
+  }
+  /* Freeze on the finished state — viewing design 1 of 3 */
+  .landing-root .genmock .genmock-after[data-i="0"] {
+    opacity: 1;
+    transform: none;
+  }
+  .landing-root .genmock .genmock-after[data-i="1"],
+  .landing-root .genmock .genmock-after[data-i="2"] {
+    opacity: 0;
+  }
+  .landing-root .genmock .genmock-style[data-i="0"] {
+    background: var(--ls-credits-badge-bg);
+    border-color: var(--ls-primary);
+    color: var(--ls-primary-dark);
+  }
+  .landing-root .genmock .genmock-asset,
+  .landing-root .genmock .genmock-results {
+    opacity: 1;
+    transform: none;
+  }
+  .landing-root .genmock .genmock-typed {
+    clip-path: inset(0 0 0 0);
+    border-right-color: transparent;
+  }
+  .landing-root .genmock .genmock-thumb[data-i="0"] {
+    border-color: var(--ls-primary);
+    box-shadow:
+      0 0 0 2px rgba(15, 128, 0, 0.4),
+      var(--ls-shadow-md);
+  }
+  .landing-root .genmock .genmock-count span[data-i="0"] {
+    opacity: 1;
+  }
+  .landing-root .genmock .genmock-shimmer,
+  .landing-root .genmock .genmock-genchip,
+  .landing-root .genmock .genmock-cursor,
+  .landing-root .genmock .genmock-gen-busy {
+    opacity: 0;
+  }
+}
+
+/* ----------------------------------------------------------
+   "Edit / re-prompt" mock. Reuses the .genmock static styles
+   for the stage / shimmer / prompt / button / cursor; .refmock
+   layers a version pill, a selection mask and an applied chip,
+   and drives one targeted edit on its own 9s timeline.
+   ---------------------------------------------------------- */
+.landing-root .how-step .step-media.refmock {
+  --loop: 9s;
+  gap: 11px;
+}
+.landing-root .refmock-v[data-i="0"] {
+  opacity: 1;
+}
+.landing-root .refmock-mask {
+  position: absolute;
+  right: 6%;
+  top: 33%;
+  width: 30%;
+  bottom: 15%;
+  border-radius: 8px;
+  border: 1.5px dashed rgba(150, 240, 130, 0.95);
+  background: rgba(45, 163, 30, 0.16);
+  box-shadow:
+    inset 0 0 0 2px rgba(15, 128, 0, 0.12),
+    0 2px 12px rgba(0, 0, 0, 0.22);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.landing-root .refmock-ver {
+  position: absolute;
+  top: 9px;
+  left: 9px;
+  display: inline-grid;
+}
+.landing-root .refmock-ver span {
+  grid-area: 1 / 1;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  background: rgba(20, 22, 18, 0.62);
+  backdrop-filter: blur(4px);
+  color: #fff;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  opacity: 0;
+}
+.landing-root .refmock-ver span[data-i="0"] {
+  opacity: 1;
+}
+
+.landing-root .refmock-applied {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  display: inline-grid;
+}
+.landing-root .refmock-applied span {
+  grid-area: 1 / 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px 5px 9px;
+  border-radius: 9999px;
+  background: rgba(15, 128, 0, 0.92);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(6px);
+}
+.landing-root .refmock-applied span svg {
+  width: 12px;
+  height: 12px;
+}
+
+.landing-root .refmock-prompt {
+  gap: 7px;
+}
+.landing-root .refmock-arrow {
+  flex-shrink: 0;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ls-primary);
+  line-height: 1;
+}
+.landing-root .refmock-typed {
+  opacity: 0;
+}
+.landing-root .refmock-idle svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Run the loop only while in view */
+.landing-root .refmock.playing .refmock-v[data-i="1"] {
+  animation: refmock-v1 var(--loop) ease infinite;
+}
+.landing-root .refmock.playing .refmock-mask {
+  animation: refmock-mask var(--loop) ease infinite;
+}
+.landing-root .refmock.playing .refmock-shimmer {
+  animation: refmock-shimmer var(--loop) ease-in-out infinite;
+}
+.landing-root .refmock.playing .refmock-ver span[data-i="0"] {
+  animation: refmock-ver-0 var(--loop) ease infinite;
+}
+.landing-root .refmock.playing .refmock-ver span[data-i="1"] {
+  animation: refmock-ver-1 var(--loop) ease infinite;
+}
+.landing-root .refmock.playing .refmock-applied span[data-i="0"] {
+  animation: refmock-applied-0 var(--loop) ease infinite;
+}
+.landing-root .refmock.playing .refmock-typed[data-i="0"] {
+  animation:
+    refmock-type-0 var(--loop) steps(27, end) infinite,
+    refmock-fade-0 var(--loop) ease infinite,
+    genmock-caret 0.9s steps(1) infinite;
+}
+.landing-root .refmock.playing .refmock-cursor {
+  animation: refmock-cursor var(--loop) cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+.landing-root .refmock.playing .refmock-refine {
+  animation: refmock-pulse var(--loop) ease infinite;
+}
+.landing-root .refmock.playing .refmock-idle {
+  animation: refmock-idle var(--loop) ease infinite;
+}
+.landing-root .refmock.playing .refmock-busy {
+  animation: refmock-busy var(--loop) ease infinite;
+}
+
+/* Timeline (9s loop): show Premium, type the edit, select the area,
+   Refine → shimmer cross-fades to the edited result, hold, reset. */
+@keyframes refmock-v1 {
+  0%,
+  50% {
+    opacity: 0;
+  }
+  62%,
+  88% {
+    opacity: 1;
+  }
+  94%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes refmock-mask {
+  0%,
+  34% {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  40%,
+  54% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  60%,
+  100% {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+
+@keyframes refmock-shimmer {
+  0%,
+  48% {
+    opacity: 0;
+    transform: translateX(-140%) skewX(-12deg);
+  }
+  52% {
+    opacity: 0.85;
+  }
+  58% {
+    opacity: 0.85;
+  }
+  62% {
+    opacity: 0;
+    transform: translateX(175%) skewX(-12deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(175%) skewX(-12deg);
+  }
+}
+
+@keyframes refmock-ver-0 {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  56%,
+  90% {
+    opacity: 0;
+  }
+  95%,
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes refmock-ver-1 {
+  0%,
+  54% {
+    opacity: 0;
+  }
+  60%,
+  90% {
+    opacity: 1;
+  }
+  95%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes refmock-applied-0 {
+  0%,
+  56% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  62%,
+  84% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  89%,
+  100% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@keyframes refmock-type-0 {
+  0%,
+  8% {
+    clip-path: inset(0 100% 0 0);
+  }
+  40% {
+    clip-path: inset(0 0 0 0);
+  }
+  88% {
+    clip-path: inset(0 0 0 0);
+  }
+  89%,
+  100% {
+    clip-path: inset(0 100% 0 0);
+  }
+}
+@keyframes refmock-fade-0 {
+  0%,
+  4% {
+    opacity: 0;
+  }
+  8%,
+  88% {
+    opacity: 1;
+  }
+  90%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes refmock-cursor {
+  0%,
+  30% {
+    opacity: 0;
+    left: 58%;
+    top: 74%;
+    transform: scale(0.8);
+  }
+  36% {
+    opacity: 1;
+    left: 74%;
+    top: 82%;
+    transform: scale(1);
+  }
+  42% {
+    opacity: 1;
+    left: 87%;
+    top: 86%;
+    transform: scale(1);
+  }
+  44% {
+    opacity: 1;
+    left: 87%;
+    top: 86%;
+    transform: scale(0.82);
+  }
+  46% {
+    opacity: 1;
+    left: 87%;
+    top: 86%;
+    transform: scale(1);
+  }
+  54% {
+    opacity: 0;
+    left: 89%;
+    top: 88%;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    left: 58%;
+    top: 74%;
+    transform: scale(0.8);
+  }
+}
+
+@keyframes refmock-pulse {
+  0%,
+  42% {
+    transform: scale(1);
+    box-shadow: 0 2px 6px rgba(15, 128, 0, 0.28);
+  }
+  44% {
+    transform: scale(0.95);
+  }
+  46% {
+    transform: scale(1);
+  }
+  47%,
+  61% {
+    box-shadow:
+      0 0 0 4px rgba(15, 128, 0, 0.16),
+      0 2px 8px rgba(15, 128, 0, 0.32);
+  }
+  64%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 2px 6px rgba(15, 128, 0, 0.28);
+  }
+}
+
+@keyframes refmock-idle {
+  0%,
+  43% {
+    opacity: 1;
+  }
+  46%,
+  61% {
+    opacity: 0;
+  }
+  64%,
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes refmock-busy {
+  0%,
+  44% {
+    opacity: 0;
+  }
+  47%,
+  60% {
+    opacity: 1;
+  }
+  63%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-root .refmock.playing .refmock-v[data-i="1"],
+  .landing-root .refmock.playing .refmock-mask,
+  .landing-root .refmock.playing .refmock-shimmer,
+  .landing-root .refmock.playing .refmock-ver span[data-i="0"],
+  .landing-root .refmock.playing .refmock-ver span[data-i="1"],
+  .landing-root .refmock.playing .refmock-applied span[data-i="0"],
+  .landing-root .refmock.playing .refmock-typed[data-i="0"],
+  .landing-root .refmock.playing .refmock-cursor,
+  .landing-root .refmock.playing .refmock-refine,
+  .landing-root .refmock.playing .refmock-idle,
+  .landing-root .refmock.playing .refmock-busy {
+    animation: none;
+  }
+  /* Freeze on the edited result */
+  .landing-root .refmock .refmock-v[data-i="1"] {
+    opacity: 1;
+  }
+  .landing-root .refmock .refmock-ver span {
+    opacity: 0;
+  }
+  .landing-root .refmock .refmock-ver span[data-i="1"] {
+    opacity: 1;
+  }
+  .landing-root .refmock .refmock-applied span[data-i="0"] {
+    opacity: 1;
+    transform: none;
+  }
+  .landing-root .refmock .refmock-typed[data-i="0"] {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+    border-right-color: transparent;
+  }
+  .landing-root .refmock .refmock-mask,
+  .landing-root .refmock .refmock-shimmer,
+  .landing-root .refmock .refmock-cursor,
+  .landing-root .refmock .refmock-busy {
+    opacity: 0;
+  }
+}
+
+/* ----------------------------------------------------------
+   Step 03 media — "generate video" mock. Reuses the .genmock
+   stage + prompt-row + button; .vidmock fills the stage with a
+   looping before→after clip and a "rendering" chip.
+   ---------------------------------------------------------- */
+.landing-root .vidmock-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.landing-root .vidmock-chip {
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px;
+  border-radius: 9999px;
+  background: rgba(20, 22, 18, 0.62);
+  backdrop-filter: blur(4px);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+}
+.landing-root .vidmock-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ls-primary-light);
+  animation: vidmock-pulse 1.8s ease-out infinite;
+}
+.landing-root .vidmock-meta {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ls-panel-muted);
+}
+.landing-root .vidmock-btn {
+  gap: 7px;
+}
+.landing-root .vidmock-btn svg {
+  width: 17px;
+  height: 17px;
+}
+@keyframes vidmock-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(45, 163, 30, 0.5);
+  }
+  70% {
+    box-shadow: 0 0 0 7px rgba(45, 163, 30, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(45, 163, 30, 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing-root .vidmock-dot {
+    animation: none;
+  }
+}
+
 @media (max-width: 900px) {
   .landing-root .how {
     padding: 72px 20px;
@@ -2063,7 +3814,7 @@
 }
 .landing-root .aud-panel .ap-copy { max-width: 480px; }
 .landing-root .aud-panel .ap-eyebrow {
-  font-family: var(--font-mono, ui-monospace);
+  font-family: inherit;
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.08em;
@@ -2130,13 +3881,715 @@
   padding: 8px 16px;
   background: #fff;
   border-radius: 9999px;
-  font-family: var(--font-mono, ui-monospace);
+  font-family: inherit;
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ls-muted-fg);
   border: 1px solid var(--ls-border);
 }
+/* ==========================================================
+   Audience visuals — DIY phone + Pro dashboard animated mocks.
+   Both reuse the lp-house-* images; animations gate on .playing
+   and freeze to a finished state under prefers-reduced-motion.
+   ========================================================== */
+.landing-root .aud-visual.diymock,
+.landing-root .aud-visual.promock {
+  border: none;
+  background: none;
+  overflow: visible;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.landing-root .aud-visual.diymock::after,
+.landing-root .aud-visual.promock::after {
+  content: none;
+}
+/* Faint vegetation watermark behind each visual — slightly darker than the
+   section beige — for a layered backdrop. */
+.landing-root .aud-visual.diymock::before,
+.landing-root .aud-visual.promock::before {
+  content: "";
+  position: absolute;
+  inset: -4%;
+  z-index: 0;
+  pointer-events: none;
+  background: url("/landing/veg-watermark.svg") repeat;
+  background-size: 132px 132px;
+  opacity: 0.1;
+  -webkit-mask-image: radial-gradient(80% 76% at 50% 48%, #000 46%, transparent 100%);
+  mask-image: radial-gradient(80% 76% at 50% 48%, #000 46%, transparent 100%);
+}
+
+/* ---- Homeowner DIY — phone app (floats directly on the section bg) ---- */
+.landing-root .diymock-stage {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: scale(1.2);
+}
+.landing-root .diymock-phone {
+  position: relative;
+  height: 90%;
+  aspect-ratio: 9 / 19.5;
+  border-radius: 30px;
+  background: #15171a;
+  padding: 7px;
+  box-shadow:
+    0 22px 44px -14px rgba(0, 0, 0, 0.5),
+    0 3px 8px rgba(0, 0, 0, 0.25);
+  transform: rotate(-4deg);
+}
+.landing-root .diymock-screen {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 23px;
+  overflow: hidden;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+}
+.landing-root .diymock-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 9px 7px;
+  border-bottom: 1px solid var(--ls-panel-border);
+}
+.landing-root .diymock-chevron svg {
+  width: 13px;
+  height: 13px;
+  color: var(--ls-fg);
+  display: block;
+}
+.landing-root .diymock-title {
+  flex: 1;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ls-fg);
+}
+.landing-root .diymock-cred {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ls-primary);
+}
+.landing-root .diymock-canvas {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.landing-root .diymock-base,
+.landing-root .diymock-design {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.landing-root .diymock-design {
+  opacity: 0;
+}
+.landing-root .diymock-shimmer {
+  position: absolute;
+  top: -20%;
+  bottom: -20%;
+  left: 0;
+  width: 46%;
+  opacity: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(214, 255, 200, 0.5) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: translateX(-160%) skewX(-12deg);
+}
+.landing-root .diymock-styles {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px;
+}
+.landing-root .diymock-style {
+  position: relative;
+  font-size: 9.5px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 9999px;
+  background: #fff;
+  border: 1px solid var(--ls-border);
+  color: var(--ls-muted-fg);
+  white-space: nowrap;
+}
+.landing-root .diymock-tap {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
+  border-radius: 50%;
+  border: 2px solid var(--ls-primary);
+  opacity: 0;
+  pointer-events: none;
+}
+.landing-root .diymock-gen {
+  margin-left: auto;
+  font-size: 9.5px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--ls-primary);
+  border: none;
+  padding: 5px 11px;
+  border-radius: 9999px;
+  white-space: nowrap;
+}
+.landing-root .diymock-pill {
+  position: absolute;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border-radius: 9999px;
+  background: #fff;
+  border: 1px solid var(--ls-panel-border-strong);
+  box-shadow:
+    0 10px 22px -6px rgba(0, 0, 0, 0.28),
+    0 2px 5px rgba(0, 0, 0, 0.12);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ls-fg);
+  white-space: nowrap;
+}
+.landing-root .diymock-pill svg {
+  width: 14px;
+  height: 14px;
+  color: var(--ls-primary);
+}
+/* Overlap the phone slightly (over the photo area) for a layered look */
+.landing-root .diymock-pill--a {
+  left: 12%;
+  top: 27%;
+}
+.landing-root .diymock-pill--b {
+  right: 9%;
+  bottom: 30%;
+}
+
+/* DIY animations */
+.landing-root .diymock.playing .diymock-phone {
+  animation: diymock-bob 4.6s ease-in-out infinite;
+}
+.landing-root .diymock.playing .diymock-pill--a {
+  animation: diymock-float 5.2s ease-in-out infinite;
+}
+.landing-root .diymock.playing .diymock-pill--b {
+  animation: diymock-float 5.8s ease-in-out infinite 0.6s;
+}
+.landing-root .diymock.playing .diymock-design[data-i="0"] {
+  animation: diymock-design-0 8s ease infinite;
+}
+.landing-root .diymock.playing .diymock-design[data-i="1"] {
+  animation: diymock-design-1 8s ease infinite;
+}
+.landing-root .diymock.playing .diymock-shimmer {
+  animation: diymock-shimmer 8s ease-in-out infinite;
+}
+.landing-root .diymock.playing .diymock-style[data-i="0"] {
+  animation: diymock-style-0 8s ease infinite;
+}
+.landing-root .diymock.playing .diymock-style[data-i="1"] {
+  animation: diymock-style-1 8s ease infinite;
+}
+.landing-root .diymock.playing .diymock-tap[data-i="0"] {
+  animation: diymock-tap 8s ease-out infinite;
+}
+.landing-root .diymock.playing .diymock-tap[data-i="1"] {
+  animation: diymock-tap 8s ease-out infinite;
+  animation-delay: -4s;
+}
+
+@keyframes diymock-bob {
+  0%,
+  100% {
+    transform: rotate(-4deg) translateY(0);
+  }
+  50% {
+    transform: rotate(-4deg) translateY(-7px);
+  }
+}
+@keyframes diymock-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+/* design 0 (Cottage) shows 26–88%, design 1 (Modern) layers on at 64% */
+@keyframes diymock-design-0 {
+  0%,
+  16% {
+    opacity: 0;
+  }
+  26%,
+  88% {
+    opacity: 1;
+  }
+  94%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes diymock-design-1 {
+  0%,
+  54% {
+    opacity: 0;
+  }
+  64%,
+  88% {
+    opacity: 1;
+  }
+  94%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes diymock-shimmer {
+  0%,
+  16% {
+    opacity: 0;
+    transform: translateX(-160%) skewX(-12deg);
+  }
+  21% {
+    opacity: 0.9;
+  }
+  26% {
+    opacity: 0;
+    transform: translateX(180%) skewX(-12deg);
+  }
+  54% {
+    opacity: 0;
+    transform: translateX(-160%) skewX(-12deg);
+  }
+  59% {
+    opacity: 0.9;
+  }
+  64% {
+    opacity: 0;
+    transform: translateX(180%) skewX(-12deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(180%) skewX(-12deg);
+  }
+}
+@keyframes diymock-style-0 {
+  0%,
+  10% {
+    background: #fff;
+    border-color: var(--ls-border);
+    color: var(--ls-muted-fg);
+  }
+  14%,
+  46% {
+    background: var(--ls-credits-badge-bg);
+    border-color: var(--ls-primary);
+    color: var(--ls-primary-dark);
+  }
+  50%,
+  100% {
+    background: #fff;
+    border-color: var(--ls-border);
+    color: var(--ls-muted-fg);
+  }
+}
+@keyframes diymock-style-1 {
+  0%,
+  50% {
+    background: #fff;
+    border-color: var(--ls-border);
+    color: var(--ls-muted-fg);
+  }
+  54%,
+  88% {
+    background: var(--ls-credits-badge-bg);
+    border-color: var(--ls-primary);
+    color: var(--ls-primary-dark);
+  }
+  92%,
+  100% {
+    background: #fff;
+    border-color: var(--ls-border);
+    color: var(--ls-muted-fg);
+  }
+}
+@keyframes diymock-tap {
+  0%,
+  10% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  13% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  20% {
+    opacity: 0;
+    transform: scale(1.7);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.7);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-root .diymock.playing .diymock-phone,
+  .landing-root .diymock.playing .diymock-pill--a,
+  .landing-root .diymock.playing .diymock-pill--b,
+  .landing-root .diymock.playing .diymock-design[data-i="0"],
+  .landing-root .diymock.playing .diymock-design[data-i="1"],
+  .landing-root .diymock.playing .diymock-shimmer,
+  .landing-root .diymock.playing .diymock-style[data-i="0"],
+  .landing-root .diymock.playing .diymock-style[data-i="1"],
+  .landing-root .diymock.playing .diymock-tap[data-i="0"],
+  .landing-root .diymock.playing .diymock-tap[data-i="1"] {
+    animation: none;
+  }
+  .landing-root .diymock .diymock-design[data-i="1"] {
+    opacity: 1;
+  }
+  .landing-root .diymock .diymock-style[data-i="1"] {
+    background: var(--ls-credits-badge-bg);
+    border-color: var(--ls-primary);
+    color: var(--ls-primary-dark);
+  }
+  .landing-root .diymock .diymock-shimmer,
+  .landing-root .diymock .diymock-tap {
+    opacity: 0;
+  }
+}
+
+/* ---- Landscape Pro — desktop dashboard (floats directly on the section bg) ---- */
+.landing-root .promock {
+  padding: 6px;
+}
+.landing-root .promock-win {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  transform: scale(1.13);
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid var(--ls-panel-border-strong);
+  box-shadow:
+    0 24px 50px -18px rgba(0, 0, 0, 0.42),
+    0 4px 10px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+}
+.landing-root .promock-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--ls-panel-border);
+  background: var(--ls-panel);
+}
+.landing-root .promock-brand svg {
+  width: 16px;
+  height: 16px;
+  color: var(--ls-primary);
+  display: block;
+}
+.landing-root .promock-proj {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ls-fg);
+}
+.landing-root .promock-zone {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ls-primary-dark);
+  background: var(--ls-credits-badge-bg);
+  padding: 3px 8px;
+  border-radius: 9999px;
+}
+.landing-root .promock-share {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--ls-primary);
+  border: none;
+  padding: 5px 10px;
+  border-radius: 8px;
+}
+.landing-root .promock-share svg {
+  width: 13px;
+  height: 13px;
+}
+.landing-root .promock-body {
+  display: grid;
+  grid-template-columns: 1.55fr 1fr;
+  gap: 10px;
+  padding: 10px;
+  align-items: stretch;
+}
+.landing-root .promock-main {
+  position: relative;
+  border-radius: 9px;
+  overflow: hidden;
+  aspect-ratio: 16 / 11;
+  background: #1b1d18;
+  border: 1px solid var(--ls-panel-border);
+}
+.landing-root .promock-render {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+}
+.landing-root .promock-shimmer {
+  position: absolute;
+  top: -25%;
+  bottom: -25%;
+  left: 0;
+  width: 44%;
+  opacity: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(214, 255, 200, 0.5) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: translateX(-160%) skewX(-12deg);
+}
+.landing-root .promock-toast {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%) translateY(6px);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 9999px;
+  background: rgba(15, 128, 0, 0.94);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+}
+.landing-root .promock-toast svg {
+  width: 12px;
+  height: 12px;
+}
+.landing-root .promock-side {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto 1fr 1fr;
+  gap: 7px;
+}
+.landing-root .promock-sidehead {
+  grid-column: 1 / -1;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ls-panel-muted);
+}
+.landing-root .promock-tile {
+  position: relative;
+  border-radius: 7px;
+  background-size: cover;
+  background-position: center;
+  border: 2px solid transparent;
+  box-shadow: var(--ls-shadow-sm);
+  opacity: 0;
+  transform: scale(0.8);
+  overflow: hidden;
+}
+.landing-root .promock-tilelabel {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  padding: 2px 6px;
+  border-radius: 9999px;
+  background: rgba(20, 22, 18, 0.6);
+  backdrop-filter: blur(2px);
+  color: #fff;
+  font-size: 8.5px;
+  font-weight: 600;
+}
+
+/* Pro animations (9s loop): render 4 styles in parallel (tiles pop in),
+   then the main preview cycles through them with the active tile ringed,
+   and a read-only link is copied. */
+.landing-root .promock.playing .promock-render[data-i="0"] {
+  animation: promock-render-0 9s ease infinite;
+}
+.landing-root .promock.playing .promock-render[data-i="1"] {
+  animation: promock-render-1 9s ease infinite;
+}
+.landing-root .promock.playing .promock-render[data-i="2"] {
+  animation: promock-render-2 9s ease infinite;
+}
+.landing-root .promock.playing .promock-render[data-i="3"] {
+  animation: promock-render-3 9s ease infinite;
+}
+.landing-root .promock.playing .promock-tile[data-i="0"] {
+  animation: promock-tile-0 9s ease infinite;
+}
+.landing-root .promock.playing .promock-tile[data-i="1"] {
+  animation: promock-tile-1 9s ease infinite;
+}
+.landing-root .promock.playing .promock-tile[data-i="2"] {
+  animation: promock-tile-2 9s ease infinite;
+}
+.landing-root .promock.playing .promock-tile[data-i="3"] {
+  animation: promock-tile-3 9s ease infinite;
+}
+.landing-root .promock.playing .promock-shimmer {
+  animation: promock-shimmer 9s ease-in-out infinite;
+}
+.landing-root .promock.playing .promock-toast {
+  animation: promock-toast 9s ease infinite;
+}
+.landing-root .promock.playing .promock-share {
+  animation: promock-share-pulse 9s ease infinite;
+}
+
+@keyframes promock-render-0 {
+  0%, 26% { opacity: 0; }
+  32%, 89% { opacity: 1; }
+  94%, 100% { opacity: 0; }
+}
+@keyframes promock-render-1 {
+  0%, 44% { opacity: 0; }
+  49%, 89% { opacity: 1; }
+  94%, 100% { opacity: 0; }
+}
+@keyframes promock-render-2 {
+  0%, 60% { opacity: 0; }
+  65%, 89% { opacity: 1; }
+  94%, 100% { opacity: 0; }
+}
+@keyframes promock-render-3 {
+  0%, 76% { opacity: 0; }
+  81%, 89% { opacity: 1; }
+  94%, 100% { opacity: 0; }
+}
+@keyframes promock-tile-0 {
+  0%, 5% { opacity: 0; transform: scale(0.8); border-color: transparent; }
+  11% { opacity: 1; transform: scale(1.06); border-color: transparent; }
+  14% { opacity: 1; transform: scale(1); border-color: transparent; }
+  30% { border-color: transparent; }
+  33% { border-color: var(--ls-primary); }
+  46% { border-color: var(--ls-primary); }
+  49% { border-color: transparent; }
+  90% { opacity: 1; transform: scale(1); border-color: transparent; }
+  96%, 100% { opacity: 0; transform: scale(0.8); }
+}
+@keyframes promock-tile-1 {
+  0%, 9% { opacity: 0; transform: scale(0.8); border-color: transparent; }
+  15% { opacity: 1; transform: scale(1.06); border-color: transparent; }
+  18% { opacity: 1; transform: scale(1); border-color: transparent; }
+  46% { border-color: transparent; }
+  49% { border-color: var(--ls-primary); }
+  62% { border-color: var(--ls-primary); }
+  65% { border-color: transparent; }
+  90% { opacity: 1; transform: scale(1); border-color: transparent; }
+  96%, 100% { opacity: 0; transform: scale(0.8); }
+}
+@keyframes promock-tile-2 {
+  0%, 13% { opacity: 0; transform: scale(0.8); border-color: transparent; }
+  19% { opacity: 1; transform: scale(1.06); border-color: transparent; }
+  22% { opacity: 1; transform: scale(1); border-color: transparent; }
+  62% { border-color: transparent; }
+  65% { border-color: var(--ls-primary); }
+  78% { border-color: var(--ls-primary); }
+  81% { border-color: transparent; }
+  90% { opacity: 1; transform: scale(1); border-color: transparent; }
+  96%, 100% { opacity: 0; transform: scale(0.8); }
+}
+@keyframes promock-tile-3 {
+  0%, 17% { opacity: 0; transform: scale(0.8); border-color: transparent; }
+  23% { opacity: 1; transform: scale(1.06); border-color: transparent; }
+  26% { opacity: 1; transform: scale(1); border-color: transparent; }
+  78% { border-color: transparent; }
+  81% { border-color: var(--ls-primary); }
+  90% { border-color: var(--ls-primary); }
+  93% { border-color: transparent; }
+  96%, 100% { opacity: 0; transform: scale(0.8); border-color: transparent; }
+}
+@keyframes promock-shimmer {
+  0%, 6% { opacity: 0; transform: translateX(-160%) skewX(-12deg); }
+  12% { opacity: 0.85; }
+  24% { opacity: 0.85; }
+  30% { opacity: 0; transform: translateX(180%) skewX(-12deg); }
+  100% { opacity: 0; transform: translateX(180%) skewX(-12deg); }
+}
+@keyframes promock-toast {
+  0%, 62% { opacity: 0; transform: translateX(-50%) translateY(6px); }
+  67%, 84% { opacity: 1; transform: translateX(-50%) translateY(0); }
+  88%, 100% { opacity: 0; transform: translateX(-50%) translateY(6px); }
+}
+@keyframes promock-share-pulse {
+  0%, 60% { transform: scale(1); box-shadow: 0 0 0 0 rgba(15, 128, 0, 0); }
+  63% { transform: scale(0.95); }
+  66% { transform: scale(1); box-shadow: 0 0 0 6px rgba(15, 128, 0, 0.16); }
+  74%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(15, 128, 0, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-root .promock.playing .promock-render[data-i="0"],
+  .landing-root .promock.playing .promock-render[data-i="1"],
+  .landing-root .promock.playing .promock-render[data-i="2"],
+  .landing-root .promock.playing .promock-render[data-i="3"],
+  .landing-root .promock.playing .promock-tile[data-i="0"],
+  .landing-root .promock.playing .promock-tile[data-i="1"],
+  .landing-root .promock.playing .promock-tile[data-i="2"],
+  .landing-root .promock.playing .promock-tile[data-i="3"],
+  .landing-root .promock.playing .promock-shimmer,
+  .landing-root .promock.playing .promock-toast,
+  .landing-root .promock.playing .promock-share {
+    animation: none;
+  }
+  .landing-root .promock .promock-render[data-i="2"] {
+    opacity: 1;
+  }
+  .landing-root .promock .promock-tile {
+    opacity: 1;
+    transform: none;
+  }
+  .landing-root .promock .promock-tile[data-i="2"] {
+    border-color: var(--ls-primary);
+  }
+  .landing-root .promock .promock-shimmer,
+  .landing-root .promock .promock-toast {
+    opacity: 0;
+  }
+}
+
 @media (max-width: 900px) {
   .landing-root .audience { padding: 72px 20px; }
   .landing-root .aud-stage { min-height: 0; }
